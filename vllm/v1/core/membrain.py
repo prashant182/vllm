@@ -299,6 +299,7 @@ class MembrainStore:
 
         except Exception as e:
             logger.error(f"Failed to load block {block_hash}: {e}")
+            logger.exception("Exception details:")
             return None
 
         finally:

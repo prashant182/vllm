@@ -16,9 +16,9 @@ import torch
 import logging
 import argparse
 
-# Configure logging to show INFO level messages
+# Configure logging to show DEBUG level messages
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
@@ -31,7 +31,7 @@ parser.add_argument("--model", type=str, default="facebook/opt-125m",
                    help="Model to use for testing")
 parser.add_argument("--disable-membrain", action="store_true",
                    help="Disable Membrain (use standard prefix caching)")
-parser.add_argument("--namespace", type=str, default="test-demo",
+parser.add_argument("--namespace", type=str, default="default",
                    help="Membrain namespace to use")
 args = parser.parse_args()
 
