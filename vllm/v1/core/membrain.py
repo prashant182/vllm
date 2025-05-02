@@ -192,11 +192,13 @@ class MembrainStore:
             bool: Success status
         """
         if block_hash in self._pending_stores:
+            logger.warning(f"Block {block_hash} already being stored, skipping")
             return False
 
         try:
             self._pending_stores.add(block_hash)
             start_time = time.time()
+            logger.debug(f"Starting store operation for block {block_hash}")
 
             # Prepare metadata
             block_meta = MembrainBlockMetadata(
@@ -219,6 +221,7 @@ class MembrainStore:
 
             # Store tensor data with block hash as key
             tensor_bytes = _serialize_tensor(tensor)
+            logger.info(f"MEMBRAIN STORE: Key {block_hash}, shape {tensor.shape}, size {len(tensor_bytes)} bytes")
             await self._request('PUT', block_hash, tensor_bytes)
             
             if self.config.enable_metrics:
@@ -233,10 +236,13 @@ class MembrainStore:
 
         except Exception as e:
             logger.error(f"Failed to store block {block_hash}: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
 
         finally:
-            self._pending_stores.remove(block_hash)
+            if block_hash in self._pending_stores:
+                self._pending_stores.remove(block_hash)
 
     async def load_block(
         self,
@@ -251,18 +257,22 @@ class MembrainStore:
             Optional[torch.Tensor]: Loaded tensor or None if not found
         """
         if block_hash in self._pending_loads:
+            logger.warning(f"Block {block_hash} already being loaded, skipping")
             return None
 
         try:
             start_time = time.time()
             self._pending_loads.add(block_hash)
+            logger.debug(f"Starting load operation for block {block_hash}")
 
             # First check metadata exists
             meta_key = f"{block_hash}:meta"
             try:
+                logger.debug(f"Loading metadata for block {block_hash}")
                 meta_bytes = await self._request('GET', meta_key)
                 meta_dict = json.loads(meta_bytes.decode())
                 block_meta = MembrainBlockMetadata(**meta_dict)
+                logger.debug(f"Found metadata for block {block_hash}: ref_count={block_meta.ref_count}")
             except KeyError:
                 if self.config.enable_metrics:
                     self.misses += 1
@@ -271,8 +281,12 @@ class MembrainStore:
 
             # Then load tensor data
             try:
+                logger.debug(f"Loading tensor data for block {block_hash}")
                 tensor_bytes = await self._request('GET', block_hash)
+                logger.debug(f"Received {len(tensor_bytes)} bytes for block {block_hash}")
+                
                 tensor = _deserialize_tensor(tensor_bytes)
+                logger.debug(f"Deserialized tensor for block {block_hash}, shape: {tensor.shape}")
                 
                 if self.config.enable_metrics:
                     self.hits += 1
@@ -299,11 +313,13 @@ class MembrainStore:
 
         except Exception as e:
             logger.error(f"Failed to load block {block_hash}: {e}")
-            logger.exception("Exception details:")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
 
         finally:
-            self._pending_loads.remove(block_hash)
+            if block_hash in self._pending_loads:
+                self._pending_loads.remove(block_hash)
 
     async def increment_ref(self, block_hash: str) -> int:
         """Increment block reference count.

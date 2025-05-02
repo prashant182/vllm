@@ -22,8 +22,10 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-# Enable vLLM V1
-os.environ["VLLM_USE_V1"] = "1"
+# Enable vLLM V1 
+os.environ["VLLM_USE_V1"] = "1" 
+# Make sure this is set before importing vllm
+print("[SETUP] Setting VLLM_USE_V1=1")
 
 # Parse arguments
 parser = argparse.ArgumentParser(description="Demonstrate Membrain caching")
@@ -40,7 +42,12 @@ if not args.disable_membrain:
     os.environ["VLLM_MEMBRAIN_ENABLED"] = "1"
     os.environ["VLLM_MEMBRAIN_ENDPOINT"] = "http://localhost:9201"
     os.environ["VLLM_MEMBRAIN_NAMESPACE"] = args.namespace
+    print(f"[SETUP] Using endpoint: http://localhost:9201")
     print(f"[SETUP] Using namespace: {args.namespace}")
+    
+    # Verify environment variables are correctly set
+    print(f"[SETUP] VLLM_USE_V1={os.environ.get('VLLM_USE_V1')}")
+    print(f"[SETUP] VLLM_MEMBRAIN_ENABLED={os.environ.get('VLLM_MEMBRAIN_ENABLED')}")
 else:
     print("\n[SETUP] Using standard prefix caching (Membrain disabled)")
     os.environ["VLLM_MEMBRAIN_ENABLED"] = "0"
@@ -133,7 +140,31 @@ print(f"[SUMMARY] First generation time: {phase1_time:.2f} seconds")
 print(f"[SUMMARY] Second generation time: {phase2_time:.2f} seconds")
 print(f"[SUMMARY] {'Membrain' if not args.disable_membrain else 'Standard prefix caching'} enabled")
 
+# Display cache metrics if available
+if not args.disable_membrain:
+    try:
+        # Access internal llm engine and then kv cache manager to get metrics
+        if hasattr(llm, '_llm_engine') and hasattr(llm._llm_engine, 'scheduler'):
+            kv_cache_manager = llm._llm_engine.scheduler.kv_cache_manager
+            if hasattr(kv_cache_manager, 'get_metrics'):
+                metrics = kv_cache_manager.get_metrics()
+                print("\n[METRICS] Cache Statistics:")
+                if 'membrain' in metrics:
+                    print(f"  - Store attempts: {metrics['membrain'].get('store_attempts', 'N/A')}")
+                    print(f"  - Store successes: {metrics['membrain'].get('store_successes', 'N/A')}")
+                    print(f"  - Load attempts: {metrics['membrain'].get('load_attempts', 'N/A')}")
+                    print(f"  - Load successes: {metrics['membrain'].get('load_successes', 'N/A')}")
+                    print(f"  - Remote blocks tracked: {metrics['membrain'].get('tracked_remote_blocks', 'N/A')}")
+                    
+                    # Remote server metrics  
+                    print(f"  - Server hits: {metrics['membrain'].get('hits', 'N/A')}")
+                    print(f"  - Server misses: {metrics['membrain'].get('misses', 'N/A')}")
+                    hit_rate = metrics['membrain'].get('hit_rate', 0) * 100
+                    print(f"  - Server hit rate: {hit_rate:.1f}%")
+    except Exception as e:
+        print(f"[ERROR] Could not retrieve metrics: {e}")
+
 # If you observe "MEMBRAIN HIT" log messages during Phase 2, 
 # it confirms that the distributed cache is working properly
-print("\n[HELP] Look for 'MEMBRAIN HIT' log messages above to confirm cache hits")
+print("\n[HELP] Look for 'MEMBRAIN HIT' or 'MEMBRAIN STORE' log messages above to confirm cache operation")
 print("[HELP] If you don't see any, check that the server is running")
