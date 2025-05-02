@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 import asyncio
 import torch
+import time
 
 from vllm.logger import init_logger
 from vllm.v1.core.membrain import MembrainConfig, MembrainStore

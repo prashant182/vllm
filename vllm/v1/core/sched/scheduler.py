@@ -7,6 +7,7 @@ from collections import defaultdict, deque
 from collections.abc import Iterable
 from typing import Optional, Union
 
+import os
 from vllm.config import VllmConfig
 from vllm.distributed.kv_events import EventPublisherFactory, KVEventBatch
 from vllm.distributed.kv_transfer.kv_connector.factory import (
@@ -17,6 +18,13 @@ from vllm.multimodal import MULTIMODAL_REGISTRY, MultiModalRegistry
 from vllm.v1.core.encoder_cache_manager import (EncoderCacheManager,
                                                 compute_encoder_budget)
 from vllm.v1.core.kv_cache_manager import KVCacheManager
+# Import Membrain-related modules if available
+try:
+    from vllm.v1.core.membrain import MembrainConfig
+    from vllm.v1.core.membrain_kvmanager import MembrainKVConfig, MembrainKVCacheManager
+    MEMBRAIN_AVAILABLE = True
+except ImportError:
+    MEMBRAIN_AVAILABLE = False
 from vllm.v1.core.sched.interface import SchedulerInterface
 from vllm.v1.core.sched.output import (CachedRequestData, NewRequestData,
                                        SchedulerOutput)
@@ -134,15 +142,50 @@ class Scheduler(SchedulerInterface):
                 self.num_lookahead_tokens = self.num_spec_tokens
 
         # Create the KV cache manager.
-        self.kv_cache_manager = KVCacheManager(
-            kv_cache_config=kv_cache_config,
-            max_model_len=self.max_model_len,
-            enable_caching=self.cache_config.enable_prefix_caching,
-            caching_hash_algo=self.cache_config.prefix_caching_hash_algo,
-            use_eagle=self.use_eagle,
-            log_stats=self.log_stats,
-            enable_kv_cache_events=self.enable_kv_cache_events,
-        )
+        # Check if Membrain is enabled via environment variable
+        use_membrain = (MEMBRAIN_AVAILABLE and 
+                         os.environ.get('VLLM_MEMBRAIN_ENABLED', '0') == '1')
+        
+        if use_membrain:
+            # Set up Membrain configuration from environment variables
+            membrain_endpoint = os.environ.get('VLLM_MEMBRAIN_ENDPOINT', 'http://localhost:9201')
+            membrain_namespace = os.environ.get('VLLM_MEMBRAIN_NAMESPACE', 'default')
+            logger.info(f"Using Membrain KV Cache Manager with endpoint {membrain_endpoint}")
+            
+            # Create Membrain configuration objects
+            membrain_config = MembrainConfig(
+                endpoint=membrain_endpoint,
+                namespace=membrain_namespace,
+                enable_metrics=True
+            )
+            
+            membrain_kv_config = MembrainKVConfig(
+                membrain=membrain_config,
+                enable_metrics=True
+            )
+            
+            # Initialize Membrain-enabled KV cache manager
+            self.kv_cache_manager = MembrainKVCacheManager(
+                kv_cache_config=kv_cache_config,
+                max_model_len=self.max_model_len,
+                membrain_config=membrain_kv_config,
+                enable_caching=self.cache_config.enable_prefix_caching,
+                caching_hash_algo=self.cache_config.prefix_caching_hash_algo,
+                use_eagle=self.use_eagle,
+                log_stats=self.log_stats,
+                enable_kv_cache_events=self.enable_kv_cache_events,
+            )
+        else:
+            # Use standard KV cache manager
+            self.kv_cache_manager = KVCacheManager(
+                kv_cache_config=kv_cache_config,
+                max_model_len=self.max_model_len,
+                enable_caching=self.cache_config.enable_prefix_caching,
+                caching_hash_algo=self.cache_config.prefix_caching_hash_algo,
+                use_eagle=self.use_eagle,
+                log_stats=self.log_stats,
+                enable_kv_cache_events=self.enable_kv_cache_events,
+            )
 
     def schedule(self) -> SchedulerOutput:
         # NOTE(woosuk) on the scheduling algorithm:

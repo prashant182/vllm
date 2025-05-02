@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 import uuid
+import torch
 
 from vllm.logger import init_logger
 from vllm.v1.core.kv_cache_manager import KVCacheManager
@@ -71,11 +72,14 @@ class MembrainKVCacheManager(KVCacheManager):
             if not membrain_config.node_id:
                 membrain_config.node_id = str(uuid.uuid4())
 
+            # Get dtype from the KV cache spec since it's not available directly in KVCacheConfig
+            kv_cache_spec = kv_cache_config.kv_cache_groups[0].kv_cache_spec
+            
             self.membrain = MembrainStore(
                 config=membrain_config.membrain,
                 node_id=membrain_config.node_id,
                 block_size=self.block_size,
-                dtype=kv_cache_config.dtype
+                dtype=kv_cache_spec.dtype if hasattr(kv_cache_spec, 'dtype') else torch.float16
             )
 
         # Track blocks in remote tier
@@ -110,8 +114,16 @@ class MembrainKVCacheManager(KVCacheManager):
                 continue
 
             # Try to load from remote
-            # Note: In real implementation this would be async
-            tensor = self.membrain.load_block(block_hash)  # type: ignore
+            # We need to handle async methods differently in a sync context
+            try:
+                # Create a simple asyncio event loop to run the async code
+                import asyncio
+                loop = asyncio.new_event_loop()
+                tensor = loop.run_until_complete(self.membrain.load_block(block_hash))
+                loop.close()
+            except Exception as e:
+                logger.error(f"Failed to load block from Membrain: {e}")
+                tensor = None
             if tensor is None:
                 break
 
@@ -171,15 +183,22 @@ class MembrainKVCacheManager(KVCacheManager):
                 continue
 
             # Store block remotely
-            # Note: In real implementation this would be async
-            success = self.membrain.store_block(  # type: ignore
-                block_hash,
-                block.tensor,  # type: ignore
-                metadata={
-                    "request_id": request.request_id,
-                    "node_id": self.membrain_config.node_id  # type: ignore
-                }
-            )
+            try:
+                # Create a simple asyncio event loop to run the async code
+                import asyncio
+                loop = asyncio.new_event_loop()
+                success = loop.run_until_complete(self.membrain.store_block(
+                    block_hash,
+                    block.tensor,  # type: ignore
+                    metadata={
+                        "request_id": request.request_id,
+                        "node_id": self.membrain_config.node_id  # type: ignore
+                    }
+                ))
+                loop.close()
+            except Exception as e:
+                logger.error(f"Failed to store block to Membrain: {e}")
+                success = False
 
             if success:
                 self.remote_blocks[block_hash] = block
@@ -207,8 +226,14 @@ class MembrainKVCacheManager(KVCacheManager):
                 continue
 
             if block.block_hash in self.remote_blocks:
-                # Note: In real implementation this would be async
-                self.membrain.decrement_ref(block.block_hash)  # type: ignore
+                try:
+                    # Create a simple asyncio event loop to run the async code
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    loop.run_until_complete(self.membrain.decrement_ref(block.block_hash))
+                    loop.close()
+                except Exception as e:
+                    logger.error(f"Failed to decrement ref count in Membrain: {e}")
                 del self.remote_blocks[block.block_hash]
 
     def _allocate_new_block(self) -> KVCacheBlock:

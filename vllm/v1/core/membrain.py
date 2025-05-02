@@ -222,7 +222,12 @@ class MembrainStore:
             await self._request('PUT', block_hash, tensor_bytes)
             
             if self.config.enable_metrics:
-                self.store_latencies.append(time.time() - start_time)
+                elapsed = time.time() - start_time
+                self.store_latencies.append(elapsed)
+                
+            elapsed = time.time() - start_time
+            logger.info(f"MEMBRAIN STORE: Stored block {block_hash[:8]}... in {elapsed:.3f}s, "
+                       f"shape {tensor.shape}, node_id {self.node_id}")
 
             return True
 
@@ -261,6 +266,7 @@ class MembrainStore:
             except KeyError:
                 if self.config.enable_metrics:
                     self.misses += 1
+                logger.info(f"MEMBRAIN MISS: Block {block_hash[:8]}... not found in metadata")
                 return None
 
             # Then load tensor data
@@ -280,11 +286,15 @@ class MembrainStore:
                     json.dumps(asdict(block_meta)).encode()
                 )
                 
+                elapsed = time.time() - start_time
+                logger.info(f"MEMBRAIN HIT: Loaded block {block_hash[:8]}... in {elapsed:.3f}s, " 
+                           f"shape {tensor.shape}, from node {block_meta.node_id}")
                 return tensor
 
             except KeyError:
                 if self.config.enable_metrics:
                     self.misses += 1
+                logger.info(f"MEMBRAIN MISS: Block data {block_hash[:8]}... not found")
                 return None
 
         except Exception as e:
