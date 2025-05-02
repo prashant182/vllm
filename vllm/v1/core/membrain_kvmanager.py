@@ -220,6 +220,7 @@ class MembrainKVCacheManager(KVCacheManager):
             logger.warning(f"🔎 Added hash tracking for block {block.block_id}")
 
         # DIAGNOSTIC: Final summary
+        
         if remote_blocks:
             logger.warning(f"🔎 MEMBRAIN SUCCESS: Loaded {len(remote_blocks)}/{len(block_hashes)} blocks")
             logger.warning(f"🔎 Loaded blocks: {[b.block_id for b in remote_blocks]}")
