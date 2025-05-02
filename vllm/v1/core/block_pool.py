@@ -165,9 +165,18 @@ class BlockPool:
 
             # Update and added the full block to the cache.
             blk.block_hash = block_hash
+            # Explicitly mark block as full
+            if hasattr(blk, 'mark_full'):
+                blk.mark_full()
+                
             self.cached_block_hash_to_block[block_hash][blk.block_id] = blk
             if new_hashes is not None:
                 new_hashes.append(block_hash.hash_value)
+                
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"BlockPool: Block {blk.block_id} cached with hash {block_hash}")
+                
             prev_block_hash_value = block_hash.hash_value
 
         if self.enable_kv_cache_events:
@@ -326,3 +335,24 @@ class BlockPool:
         events = self.kv_event_queue
         self.kv_event_queue = []
         return events
+        
+    def get_tensor_for_block(self, block: KVCacheBlock) -> Optional[KVCacheBlock]:
+        """Get the tensor for a block.
+        
+        For Membrain integration, we need to access block tensors directly.
+        This is a helper method that returns the block if it has a tensor.
+        
+        Args:
+            block: The block to get the tensor for.
+            
+        Returns:
+            The block itself if it has a tensor, or None if it doesn't.
+        """
+        # Check if block has tensor attribute
+        if hasattr(block, 'tensor') and block.tensor is not None:
+            return block
+            
+        # In case tensors are stored in a different attribute or way
+        # Future: Add additional checks here if tensor storage changes
+        
+        return None

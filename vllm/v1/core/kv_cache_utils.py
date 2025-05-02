@@ -118,6 +118,8 @@ class KVCacheBlock:
     # The hash of the block composed of (block hash, tuple of token IDs).
     # It is only available when the block is full.
     _block_hash: Optional[BlockHashType] = None
+    # Flag to indicate if the block is full (used for debugging Membrain)
+    _is_full: bool = False
 
     # Used to construct a doubly linked list for free blocks.
     # These two attributes should only be manipulated by FreeKVCacheBlockQueue.
@@ -130,6 +132,14 @@ class KVCacheBlock:
     def decr_ref(self):
         self.ref_cnt -= 1
 
+    def is_full(self) -> bool:
+        """Check if the block is full."""
+        return self._is_full
+        
+    def mark_full(self):
+        """Mark the block as full."""
+        self._is_full = True
+
     @property
     def block_hash(self) -> Optional[BlockHashType]:
         return self._block_hash
@@ -139,10 +149,13 @@ class KVCacheBlock:
         assert self.block_hash is None, (
             "The block already has a hash. This should not happen.")
         self._block_hash = block_hash
+        # When a block is assigned a hash, it's considered full
+        self._is_full = True
 
     def reset_hash(self):
         """Reset the block hash when the block is evicted."""
         self._block_hash = None
+        self._is_full = False
 
     def __repr__(self) -> str:
         # Use block_id instead of KVCacheBlock object to avoid calling __repr__
