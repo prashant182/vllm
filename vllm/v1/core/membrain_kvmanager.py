@@ -102,10 +102,13 @@ class MembrainKVCacheManager(KVCacheManager):
         # First try local cache
         local_blocks, num_local_tokens = super().get_computed_blocks(request)
         if local_blocks or not self.membrain:
+            if local_blocks:
+                logger.info(f"Found {len(local_blocks)} blocks in local cache for request {request.request_id}")
             return local_blocks, num_local_tokens
 
         # Check remote cache
         block_hashes = self.req_to_block_hashes[request.request_id]
+        logger.info(f"Checking Membrain for {len(block_hashes)} blocks for request {request.request_id}")
         remote_blocks = []
 
         for block_hash in block_hashes:
