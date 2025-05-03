@@ -173,9 +173,9 @@ class BlockPool:
             if new_hashes is not None:
                 new_hashes.append(block_hash.hash_value)
                 
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"BlockPool: Block {blk.block_id} cached with hash {block_hash}")
+            # import logging
+            # logger = logging.getLogger(__name__)
+            # logger.info(f"BlockPool: Block {blk.block_id} cached with hash {block_hash}")
                 
             prev_block_hash_value = block_hash.hash_value
 

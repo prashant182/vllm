@@ -1,0 +1,141 @@
+[SETUP] Setting VLLM_USE_V1=1
+
+[SETUP] Enabling Membrain distributed caching
+[SETUP] Forcing CPU cache storage (VLLM_FORCE_CPU_CACHE=1)
+[SETUP] Forcing remote cache storage (VLLM_FORCE_REMOTE_CACHE=1)
+[SETUP] Using endpoint: http://localhost:9201
+[SETUP] Using namespace: test
+[SETUP] CPU cache size: 2GB
+[SETUP] VLLM_USE_V1=1
+[SETUP] VLLM_MEMBRAIN_ENABLED=1
+[SETUP] VLLM_MEMBRAIN_CPU_CACHE_SIZE_GB=2
+[SETUP] VLLM_FORCE_CPU_CACHE=1
+[SETUP] VLLM_FORCE_REMOTE_CACHE=1
+INFO 05-02 23:08:04 [__init__.py:239] Automatically detected platform cuda.
+
+[SETUP] Initializing LLM with model: facebook/opt-125m
+[SETUP] This may take a minute...
+INFO 05-02 23:08:14 [config.py:749] This model supports multiple tasks: {'classify', 'reward', 'embed', 'score', 'generate'}. Defaulting to 'generate'.
+INFO 05-02 23:08:14 [config.py:2038] Chunked prefill is enabled with max_num_batched_tokens=16384.
+INFO 05-02 23:08:14 [core.py:59] Initializing a V1 LLM engine (v0.8.5.dev358+ga44c4f1d2.d20250430) with config: model='facebook/opt-125m', speculative_config=None, tokenizer='facebook/opt-125m', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config={}, tokenizer_revision=None, trust_remote_code=False, dtype=torch.float16, max_seq_len=2048, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, kv_cache_dtype=auto,  device_config=cuda, decoding_config=DecodingConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_backend=None), observability_config=ObservabilityConfig(show_hidden_metrics=False, otlp_traces_endpoint=None, collect_model_forward_time=False, collect_model_execute_time=False), seed=None, served_model_name=facebook/opt-125m, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=True, chunked_prefill_enabled=True, use_async_output_proc=True, pooler_config=None, compilation_config={"level":3,"custom_ops":["none"],"splitting_ops":["vllm.unified_attention","vllm.unified_attention_with_output"],"use_inductor":true,"compile_sizes":[],"use_cudagraph":true,"cudagraph_num_of_warmups":1,"cudagraph_capture_sizes":[512,504,496,488,480,472,464,456,448,440,432,424,416,408,400,392,384,376,368,360,352,344,336,328,320,312,304,296,288,280,272,264,256,248,240,232,224,216,208,200,192,184,176,168,160,152,144,136,128,120,112,104,96,88,80,72,64,56,48,40,32,24,16,8,4,2,1],"max_capture_size":512}
+WARNING 05-02 23:08:14 [utils.py:2522] Methods determine_num_available_blocks,device_config,get_cache_block_size_bytes,initialize_cache not implemented in <vllm.v1.worker.gpu_worker.Worker object at 0x7f77621c50d0>
+INFO 05-02 23:08:18 [parallel_state.py:1004] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, TP rank 0
+INFO 05-02 23:08:18 [cuda.py:221] Using Flash Attention backend on V1 engine.
+WARNING 05-02 23:08:18 [topk_topp_sampler.py:69] FlashInfer is not available. Falling back to the PyTorch-native implementation of top-p & top-k sampling. For the best performance, please install FlashInfer.
+INFO 05-02 23:08:18 [gpu_model_runner.py:1335] Starting to load model facebook/opt-125m...
+INFO 05-02 23:08:18 [weight_utils.py:265] Using model weights format ['*.bin']
+Loading pt checkpoint shards:   0% Completed | 0/1 [00:00<?, ?it/s]
+Loading pt checkpoint shards: 100% Completed | 1/1 [00:00<00:00,  4.61it/s]
+Loading pt checkpoint shards: 100% Completed | 1/1 [00:00<00:00,  4.61it/s]
+
+INFO 05-02 23:08:19 [loader.py:458] Loading weights took 0.23 seconds
+INFO 05-02 23:08:19 [gpu_model_runner.py:1353] Model loading took 0.2389 GiB and 0.374530 seconds
+INFO 05-02 23:08:20 [backends.py:433] Using cache directory: /home/ec2-user/.cache/vllm/torch_compile_cache/5bd4794bc2/rank_0_0 for vLLM's torch.compile
+INFO 05-02 23:08:20 [backends.py:443] Dynamo bytecode transform time: 1.50 s
+INFO 05-02 23:08:21 [backends.py:118] Directly load the compiled graph(s) for shape None from the cache, took 0.847 s
+INFO 05-02 23:08:22 [monitor.py:33] torch.compile takes 1.50 s in total
+INFO 05-02 23:08:22 [kv_cache_utils.py:652] GPU KV cache size: 1,532,960 tokens
+INFO 05-02 23:08:22 [kv_cache_utils.py:655] Maximum concurrency for 2,048 tokens per request: 748.52x
+INFO 05-02 23:08:37 [gpu_model_runner.py:1697] Graph capturing finished in 15 secs, took 0.31 GiB
+INFO 05-02 23:08:38 [core.py:161] init engine (profile, create kv cache, warmup model) took 18.71 seconds
+INFO 05-02 23:08:38 [scheduler.py:153] Using Membrain KV Cache Manager with endpoint http://localhost:9201
+INFO 05-02 23:08:38 [membrain_kvmanager.py:77] Initialized CPU cache tier with 4.0GB
+INFO 05-02 23:08:38 [membrain_kvmanager.py:108] Initialized Membrain KV cache manager with endpoint http://localhost:9201
+INFO 05-02 23:08:38 [membrain_kvmanager.py:109] Using namespace: test
+INFO 05-02 23:08:38 [membrain_kvmanager.py:110] Node ID: ae68d036-f2c2-47a3-bcc8-193adefeb25d
+INFO 05-02 23:08:38 [core_client.py:442] Core engine process 0 ready.
+🔄 CACHE FLOW: Looking up blocks for request 0
+🔄 CACHE FLOW: GPU lookup found 0 blocks
+🔄 CACHE FLOW: Checking CPU cache for 6 blocks
+🔄 CACHE FLOW: Block 0 not in CPU cache, breaking chain
+🔄 CACHE FLOW: Checking remote tier (Membrain) for 6 blocks
+🔄 CACHE FLOW: Loading block 0 with key -321806023827370843 from remote
+🌐 REMOTE: Loading block -321806023827370843
+WARNING 05-02 23:08:38 [membrain.py:419] MEMBRAIN LOAD: Loading block with key: -321806023827370843
+🌐 REMOTE: Fetching metadata with key meta:-321806023827370843
+WARNING 05-02 23:08:38 [membrain.py:440] MEMBRAIN LOAD: Fetching metadata with key meta:-321806023827370843
+INFO 05-02 23:08:38 [membrain.py:222] Membrain API: GET http://localhost:9201/memory/test/meta:-321806023827370843
+[SETUP] Initialization completed in 30.38 seconds
+
+================================================================================
+PHASE 1: POPULATE CACHE (First Generation)
+================================================================================
+
+[TEST] Running first prompt...
+[TEST] Prompt length: 583 characters
+Processed prompts:   0%|          | 0/1 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]WARNING 05-02 23:08:38 [membrain.py:246] Key not found: meta:-321806023827370843
+🌐 REMOTE: MISS - Block -321806023827370843 metadata not found
+WARNING 05-02 23:08:38 [membrain.py:462] MEMBRAIN MISS: Block -321806023827370843 metadata not found
+Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  2.09it/s, est. speed input: 215.75 toks/s, output: 418.90 toks/s]Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  2.09it/s, est. speed input: 215.75 toks/s, output: 418.90 toks/s]
+[RESULT] First generation completed in 0.49 seconds
+
+[TEST] Running second prompt (should hit prefix cache)...
+[TEST] Common prefix length: 541 characters
+Processed prompts:   0%|          | 0/1 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  2.17it/s, est. speed input: 229.74 toks/s, output: 433.45 toks/s]Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  2.17it/s, est. speed input: 229.74 toks/s, output: 433.45 toks/s]
+[RESULT] Second generation completed in 0.46 seconds
+
+[TEST] Running third prompt (should hit prefix cache)...
+[TEST] Common prefix length: 541 characters
+Processed prompts:   0%|          | 0/1 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  2.18it/s, est. speed input: 226.27 toks/s, output: 435.11 toks/s]Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  2.17it/s, est. speed input: 226.27 toks/s, output: 435.11 toks/s]
+[RESULT] Third generation completed in 0.46 seconds
+
+================================================================================
+PHASE 2: TEST CACHE TIER HIERARCHY
+================================================================================
+
+[TEST] Waiting 3 seconds to allow cache migration between tiers...
+
+[TEST] Repeating first prompt (should hit cache tier)...
+Processed prompts:   0%|          | 0/1 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  2.16it/s, est. speed input: 222.52 toks/s, output: 432.05 toks/s]Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  2.16it/s, est. speed input: 222.52 toks/s, output: 432.05 toks/s]
+[RESULT] Repeated first prompt completed in 0.46 seconds
+[RESULT] 5.9% faster than first generation
+
+[TEST] Repeating second prompt (should hit cache tier)...
+Processed prompts:   0%|          | 0/1 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  2.17it/s, est. speed input: 229.65 toks/s, output: 433.28 toks/s]Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  2.17it/s, est. speed input: 229.65 toks/s, output: 433.28 toks/s]
+[RESULT] Repeated second prompt completed in 0.46 seconds
+[RESULT] -0.0% faster than second generation
+
+[TEST] Repeating third prompt (should hit cache tier)...
+Processed prompts:   0%|          | 0/1 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  2.15it/s, est. speed input: 223.80 toks/s, output: 430.37 toks/s]Processed prompts: 100%|██████████| 1/1 [00:00<00:00,  2.15it/s, est. speed input: 223.80 toks/s, output: 430.37 toks/s]
+[RESULT] Repeated third prompt completed in 0.47 seconds
+[RESULT] -1.2% faster than third generation
+
+================================================================================
+PHASE 4: SUMMARY AND METRICS
+================================================================================
+[SUMMARY] First generation time: 0.49 seconds
+[SUMMARY] Second generation time: 0.46 seconds
+[SUMMARY] Third generation time: 0.46 seconds
+[SUMMARY] First repeat time: 0.46 seconds (speedup: 5.9%)
+[SUMMARY] Second repeat time: 0.46 seconds (speedup: -0.0%)
+[SUMMARY] Third repeat time: 0.47 seconds (speedup: -1.2%)
+[SUMMARY] Membrain tiered caching enabled
+[ERROR] KV cache manager not found or get_metrics method not available
+
+================================================================================
+PHASE 5: VALIDATION TEST FOR MEMBRAIN CONNECTIVITY
+================================================================================
+
+[TEST] Validating Membrain connectivity with manual test...
+[ERROR] Membrain client not found in KV cache manager
+
+[HELP] Check log messages for:
+  - GPU cache: 'get_computed_blocks' returns blocks
+  - CPU cache: 'CPU cache: Loaded block' messages
+  - Membrain: 'Successfully loaded block' messages
+
+================================================================================
+TEST COMPLETE
+================================================================================
+🔄 CACHE FLOW: Block 0 not found in remote, breaking chain
+🔄 CACHE FLOW: Remote lookup found 0 blocks
+🔄 CACHE FLOW: Looking up blocks for request 1
+🔄 CACHE FLOW: GPU lookup found 6 blocks
+🔄 CACHE FLOW: Looking up blocks for request 2
+🔄 CACHE FLOW: GPU lookup found 5 blocks
+🔄 CACHE FLOW: Looking up blocks for request 3
+🔄 CACHE FLOW: GPU lookup found 6 blocks
+🔄 CACHE FLOW: Looking up blocks for request 4
+🔄 CACHE FLOW: GPU lookup found 6 blocks
+🔄 CACHE FLOW: Looking up blocks for request 5
+🔄 CACHE FLOW: GPU lookup found 6 blocks

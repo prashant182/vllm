@@ -174,6 +174,7 @@ class MembrainStore:
         self.node_id = node_id
         self.block_size = block_size
         self.dtype = dtype
+        self._enabled = True  # Enable by default
 
         # Track in-flight operations
         self._pending_stores: Set[str] = set()
@@ -188,7 +189,16 @@ class MembrainStore:
         # Session state
         self._session: Optional[aiohttp.ClientSession] = None
         self._closed = False
-
+        
+    @property
+    def enabled(self) -> bool:
+        """Return whether the Membrain store is enabled.
+        
+        Returns:
+            bool: True if enabled, False otherwise
+        """
+        return self._enabled and not self._closed
+        
     async def _ensure_session(self) -> None:
         """Ensure aiohttp session exists and is active."""
         if self._session is None or self._session.closed:
@@ -307,9 +317,18 @@ class MembrainStore:
             if match:
                 hash_key = match.group(1)
         
+        if not self.enabled:
+            print(f"🌐 REMOTE: SKIPPED - Membrain is disabled")
+            return False
+            
+        print(f"🌐 REMOTE: Storing block {hash_key}, shape={tensor.shape}")
         logger.debug(f"Using simplified hash key: {hash_key} (from {block_hash})")
+        
+        # For debugging
+        logger.warning(f"MEMBRAIN STORE: Attempting to store block with key: {hash_key}")
             
         if hash_key in self._pending_stores:
+            print(f"🌐 REMOTE: Block {hash_key} already being stored, skipping")
             logger.warning(f"Block {hash_key} already being stored, skipping")
             return False
 
@@ -342,10 +361,14 @@ class MembrainStore:
             data_key = f"data:{hash_key}"
             meta_key = f"meta:{hash_key}"
             
+            print(f"🌐 REMOTE: Prepared data key: {data_key}, meta key: {meta_key}")
+            
+            print(f"🌐 REMOTE: Sending block data, key={data_key}, size={len(tensor_bytes)/1024:.1f}KB")
             logger.warning(f"MEMBRAIN STORE: Data key {data_key}, shape {tensor.shape}, size {len(tensor_bytes)} bytes")
             await self._request('PUT', data_key, tensor_bytes, content_type="application/octet-stream")
             
             # Store metadata with meta key prefix
+            print(f"🌐 REMOTE: Sending block metadata, key={meta_key}")
             logger.warning(f"MEMBRAIN STORE: Storing metadata with key {meta_key}")
             await self._request(
                 'PUT',
@@ -359,12 +382,14 @@ class MembrainStore:
                 self.store_latencies.append(elapsed)
                 
             elapsed = time.time() - start_time
+            print(f"🌐 REMOTE: ✅ Successfully stored block {hash_key} in {elapsed:.3f}s")
             logger.warning(f"✅ MEMBRAIN STORE SUCCESS: Block {hash_key} stored in {elapsed:.3f}s, "
                        f"shape {tensor.shape}, node_id {self.node_id}")
 
             return True
 
         except Exception as e:
+            print(f"🌐 REMOTE: ❌ Failed to store block {hash_key}: {e}")
             logger.error(f"❌ Failed to store block {hash_key}: {e}")
             import traceback
             logger.error(traceback.format_exc())
@@ -399,11 +424,13 @@ class MembrainStore:
             match = re.search(r"hash_value=(-?\d+)", hash_key)
             if match:
                 hash_key = match.group(1)
-                
+        
+        print(f"🌐 REMOTE: Loading block {hash_key}")       
         logger.warning(f"MEMBRAIN LOAD: Loading block with key: {hash_key}")
                 
         # Prevent concurrent loads of the same block
         if hash_key in self._pending_loads:
+            print(f"🌐 REMOTE: Block {hash_key} already being loaded, skipping")
             logger.warning(f"Block {hash_key} already being loaded, skipping duplicate request")
             return None
 
@@ -419,6 +446,7 @@ class MembrainStore:
             # First check if metadata exists - this tells us if the block exists
             try:
                 # Get block metadata
+                print(f"🌐 REMOTE: Fetching metadata with key {meta_key}")
                 logger.warning(f"MEMBRAIN LOAD: Fetching metadata with key {meta_key}")
                 meta_bytes = await self._request('GET', meta_key, content_type="application/json")
                 meta_dict = json.loads(meta_bytes.decode())
@@ -433,27 +461,33 @@ class MembrainStore:
                     dtype=meta_dict.pop("dtype", str(self.dtype)),
                     tensor_shape=tuple(meta_dict.pop("tensor_shape", ())),
                 )
+                print(f"🌐 REMOTE: Found metadata for block {hash_key}, ref_count={block_meta.ref_count}")
                 logger.warning(f"MEMBRAIN LOAD: Found metadata for block {hash_key}: ref_count={block_meta.ref_count}")
                 
             except MembrainKeyError:
                 # Metadata not found = cache miss
+                print(f"🌐 REMOTE: MISS - Block {hash_key} metadata not found")
                 if self.config.enable_metrics:
                     self.misses += 1
                 logger.warning(f"MEMBRAIN MISS: Block {hash_key} metadata not found")
                 return None
             except Exception as e:
+                print(f"🌐 REMOTE: ERROR loading metadata for block {hash_key}: {e}")
                 logger.error(f"MEMBRAIN ERROR: Failed to load metadata for block {hash_key}: {e}")
                 return None
 
             # If metadata found, try to load the actual tensor data
             try:
                 # Get the tensor bytes
+                print(f"🌐 REMOTE: Fetching tensor data with key {data_key}")
                 logger.warning(f"MEMBRAIN LOAD: Fetching tensor data with key {data_key}")
                 tensor_bytes = await self._request('GET', data_key, content_type="application/octet-stream")
+                print(f"🌐 REMOTE: Received {len(tensor_bytes)/1024:.1f}KB for block {hash_key}")
                 logger.warning(f"MEMBRAIN LOAD: Received {len(tensor_bytes)} bytes for block {hash_key}")
                 
                 # Deserialize to PyTorch tensor
                 tensor = _deserialize_tensor(tensor_bytes)
+                print(f"🌐 REMOTE: Deserialized tensor for block {hash_key}, shape={tensor.shape}")
                 logger.warning(f"MEMBRAIN LOAD: Deserialized tensor for block {hash_key}, shape: {tensor.shape}")
                 
                 # Track metrics
@@ -463,6 +497,7 @@ class MembrainStore:
                 
                 # Update access time in metadata to support LRU eviction
                 block_meta.last_access = time.time()
+                print(f"🌐 REMOTE: Updating access time for block {hash_key}")
                 await self._request(
                     'PUT',
                     meta_key,
@@ -472,18 +507,21 @@ class MembrainStore:
                 
                 # Log success and timing
                 elapsed = time.time() - start_time
+                print(f"🌐 REMOTE: ✅ HIT - Successfully loaded block {hash_key} in {elapsed:.3f}s")
                 logger.warning(f"✅ MEMBRAIN HIT: Loaded block {hash_key} in {elapsed:.3f}s, " 
                            f"shape {tensor.shape}, from node {block_meta.node_id}")
                 return tensor
 
             except MembrainKeyError:
                 # Tensor data not found = inconsistent state (metadata exists but data doesn't)
+                print(f"🌐 REMOTE: ERROR - Block {hash_key} has metadata but data is missing")
                 if self.config.enable_metrics:
                     self.misses += 1
                 logger.error(f"MEMBRAIN ERROR: Block {hash_key} has metadata but data is missing")
                 return None
             except Exception as e:
                 # Other errors during tensor loading
+                print(f"🌐 REMOTE: ERROR loading tensor for block {hash_key}: {e}")
                 logger.error(f"MEMBRAIN ERROR: Failed to load tensor for block {hash_key}: {e}")
                 import traceback
                 logger.error(traceback.format_exc())
@@ -491,6 +529,7 @@ class MembrainStore:
 
         except Exception as e:
             # General exception during the whole load process
+            print(f"🌐 REMOTE: ERROR in load process for block {hash_key}: {e}")
             logger.error(f"MEMBRAIN ERROR: Failed to load block {hash_key}: {e}")
             import traceback
             logger.error(traceback.format_exc())
