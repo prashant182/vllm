@@ -46,6 +46,7 @@ def run_store(store_done, prompts):
               kv_transfer_config=ktc,
               max_model_len=2048,
               gpu_memory_utilization=0.8,
+              enable_prefix_caching=True,
               enforce_eager=True)
 
     outputs = llm.generate(prompts, sampling_params)
