@@ -264,15 +264,41 @@ class MembrainConnectorV1Impl:
         self._parent = parent
         self.kv_role = vllm_config.kv_transfer_config.kv_role
         
-        # Initialize Membrain client
-        membrain_endpoint = vllm_config.kv_transfer_config.get_from_extra_config(
-            "membrain_endpoint", "http://localhost:9201")
-        membrain_namespace = vllm_config.kv_transfer_config.get_from_extra_config(
-            "membrain_namespace", "vllm_kv")
+        # Initialize Membrain client with configurable endpoints
+        # Check environment variables first, then fallback to config
+        import os
+        
+        membrain_endpoint = os.environ.get(
+            "MEMBRAIN_ENDPOINT",
+            vllm_config.kv_transfer_config.get_from_extra_config(
+                "membrain_endpoint", "http://localhost:9201")
+        )
+        
+        membrain_namespace = os.environ.get(
+            "MEMBRAIN_NAMESPACE", 
+            vllm_config.kv_transfer_config.get_from_extra_config(
+                "membrain_namespace", "vllm_kv")
+        )
+        
+        membrain_timeout = float(os.environ.get(
+            "MEMBRAIN_TIMEOUT",
+            vllm_config.kv_transfer_config.get_from_extra_config(
+                "membrain_timeout", "30.0")
+        ))
+        
+        membrain_retries = int(os.environ.get(
+            "MEMBRAIN_MAX_RETRIES",
+            vllm_config.kv_transfer_config.get_from_extra_config(
+                "membrain_max_retries", "3")
+        ))
+        
+        logger.info(f"Configuring Membrain connector with endpoint {membrain_endpoint}, namespace {membrain_namespace}")
         
         self._membrain_config = MembrainConfig(
             endpoint=membrain_endpoint,
-            namespace=membrain_namespace
+            namespace=membrain_namespace,
+            timeout=membrain_timeout,
+            max_retries=membrain_retries
         )
         
         # We need to run a separate event loop for the async client
@@ -286,11 +312,22 @@ class MembrainConnectorV1Impl:
         
         # Additional configuration
         self._block_size = vllm_config.cache_config.block_size
-        self._chunk_size = vllm_config.kv_transfer_config.get_from_extra_config(
-            "chunk_size", 256)
-        self._discard_partial_chunks = vllm_config.kv_transfer_config.get_from_extra_config(
-            "discard_partial_chunks", False)
+        
+        import os
+        self._chunk_size = int(os.environ.get(
+            "MEMBRAIN_CHUNK_SIZE",
+            vllm_config.kv_transfer_config.get_from_extra_config("chunk_size", "256"))
+        )
+        
+        self._discard_partial_chunks = os.environ.get(
+            "MEMBRAIN_DISCARD_PARTIAL_CHUNKS", 
+            vllm_config.kv_transfer_config.get_from_extra_config("discard_partial_chunks", "False")
+        ).lower() in ('true', '1', 'yes')
+        
         self._model_name = vllm_config.model_config.model
+        
+        logger.info(f"Membrain connector configured with chunk_size={self._chunk_size}, "
+                   f"discard_partial_chunks={self._discard_partial_chunks}")
         
         # State tracking
         self._request_trackers = {}  # request_id -> RequestTracker
