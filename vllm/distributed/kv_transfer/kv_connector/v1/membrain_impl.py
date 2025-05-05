@@ -1,3 +1,12 @@
+"""
+This is a modified version of the membrain_impl.py file with fixes for BFloat16 serialization.
+It can be used as a drop-in replacement for the original implementation.
+
+To use it:
+1. Copy this file to the appropriate location in your vLLM deployment
+2. Update your imports to point to this implementation
+"""
+
 # SPDX-License-Identifier: Apache-2.0
 
 import asyncio
@@ -395,15 +404,17 @@ class MembrainConnectorV1Impl:
                 # Extract tensor for specific slots
                 kv_slice = torch.index_select(kv_cache, 1, indices.cuda())
                 
-                # Convert to numpy for more robust serialization
-                kv_slice_np = kv_slice.cpu().numpy()
+                # Instead of direct numpy conversion which fails for BFloat16, use PyTorch serialization
+                tensor_buffer = io.BytesIO()
+                torch.save(kv_slice.cpu(), tensor_buffer)
+                tensor_buffer.seek(0)
                 
-                # Add to the layers list
+                # Add to the layers list with serialized tensor data
                 serialized_data["layers"].append({
                     "layer_idx": layer_idx,
-                    "shape": kv_slice_np.shape,
-                    "dtype": str(kv_slice_np.dtype),
-                    "data": kv_slice_np
+                    "shape": list(kv_slice.shape),
+                    "dtype": str(kv_slice.dtype),
+                    "tensor_bytes": tensor_buffer.read(),
                 })
             
             # Serialize the entire structure
@@ -453,10 +464,9 @@ class MembrainConnectorV1Impl:
             for layer_info in deserialized_data["layers"]:
                 layer_idx = layer_info["layer_idx"]
                 
-                # Convert numpy array back to torch tensor
-                import numpy as np
-                kv_slice_np = layer_info["data"]
-                kv_slice = torch.tensor(kv_slice_np).cuda()
+                # Load the tensor from bytes
+                tensor_buffer = io.BytesIO(layer_info["tensor_bytes"])
+                kv_slice = torch.load(tensor_buffer).cuda()
                 
                 # Insert into the correct positions
                 dst_cache = kvcaches[layer_idx]
