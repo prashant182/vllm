@@ -1,0 +1,30 @@
+{
+  "success_rate": 0.0,
+  "total_requests": 100,
+  "successful_requests": 0,
+  "error_rate": 1.0,
+  "latency": {
+    "mean": 0.0,
+    "median": 0.0,
+    "p90": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "min": 0.0,
+    "max": 0.0,
+    "std": 0.0
+  },
+  "tokens": {
+    "total_prompt_tokens": 0,
+    "total_completion_tokens": 0,
+    "avg_prompt_tokens": 0.0,
+    "avg_completion_tokens": 0.0,
+    "throughput_tokens_per_second": 0.0
+  },
+  "config": {
+    "url": "http://localhost:8083/v1/chat/completions",
+    "num_prompts": 100,
+    "concurrency": 5,
+    "max_tokens": 100,
+    "prefix_reuse_rate": 0.7
+  }
+}

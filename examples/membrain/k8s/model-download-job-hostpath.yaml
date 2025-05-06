@@ -1,0 +1,75 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: model-download-hostpath
+  namespace: vllm-benchmark
+spec:
+  completions: 2  # Run on 2 nodes
+  parallelism: 2  # Run in parallel
+  template:
+    metadata:
+      labels:
+        job-name: model-download-hostpath  # Add this label for podAntiAffinity to work
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: job-name
+                operator: In
+                values:
+                - model-download-hostpath
+            topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: model-downloader
+        image: pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "4"
+          limits:
+            memory: "16Gi"
+            cpu: "8"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          apt-get update && apt-get install -y git
+          pip install huggingface_hub
+          python3 -c '
+          from huggingface_hub import snapshot_download
+          import os
+          
+          # Download model - modify model ID as needed
+          model_id = "meta-llama/Llama-3.3-70B-Instruct"
+          output_dir = "/models/Llama-3.3-70B-Instruct"
+          
+          # Check if model already exists to support retries
+          if not os.path.exists(output_dir):
+              print(f"Downloading {model_id} to {output_dir}")
+              snapshot_download(
+                  model_id, 
+                  local_dir=output_dir,
+                  local_dir_use_symlinks=False,
+                  token=os.environ.get("HF_TOKEN")
+              )
+              print("Download complete!")
+          else:
+              print(f"Model already exists at {output_dir}")
+          '
+        env:
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: huggingface-credentials
+              key: token
+        volumeMounts:
+        - name: models-volume
+          mountPath: /models
+      restartPolicy: OnFailure
+      volumes:
+      - name: models-volume
+        hostPath:
+          path: /mnt/nvme_raid/vllm-data
+          type: Directory

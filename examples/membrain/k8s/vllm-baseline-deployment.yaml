@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-baseline
+  namespace: vllm-benchmark
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vllm-baseline
+  template:
+    metadata:
+      labels:
+        app: vllm-baseline
+    spec:
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:latest
+        imagePullPolicy: Always
+        resources:
+          limits:
+            nvidia.com/gpu: 8  # Adjust based on p5.48xlarge configuration
+          requests:
+            nvidia.com/gpu: 8
+            memory: "300Gi"
+        env:
+        - name: VLLM_LOGGING_LEVEL
+          value: "DEBUG"
+        - name: VLLM_CONFIGURE_LOGGING
+          value: "1"
+        - name: VLLM_USE_V1
+          value: "1"
+        ports:
+        - containerPort: 8000
+          name: http
+        volumeMounts:
+        - name: models-volume
+          mountPath: "/models"
+          readOnly: true
+        - name: dshm
+          mountPath: /dev/shm
+        command:
+        - "/usr/bin/python3"
+        - "-m"
+        - "vllm.entrypoints.openai.api_server"
+        - "--model"
+        - "/models/Llama-3.3-70B-Instruct"
+        - "--tensor-parallel-size"  # Using TP for large model
+        - "8"  # Adjust based on GPU count
+        - "--host"
+        - "0.0.0.0"
+        - "--port"
+        - "8000"
+        - "--enable-prefix-caching"  # Enable prefix caching but without Membrain
+        - "--uvicorn-log-level"
+        - "debug"
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "16Gi"
+      - name: models-volume
+        hostPath:
+          path: /mnt/nvme_raid/vllm-data
+          type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-baseline-service
+  namespace: vllm-benchmark
+spec:
+  selector:
+    app: vllm-baseline
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: ClusterIP

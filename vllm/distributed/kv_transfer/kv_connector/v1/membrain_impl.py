@@ -1,10 +1,14 @@
 """
-This is a modified version of the membrain_impl.py file with fixes for BFloat16 serialization.
-It can be used as a drop-in replacement for the original implementation.
+Implementation of MembrainConnectorV1 for efficient KV cache sharing with Membrain.
+This implementation uses chunking and progressive transfer to efficiently handle
+large KV cache data with Membrain as the storage backend.
 
-To use it:
-1. Copy this file to the appropriate location in your vLLM deployment
-2. Update your imports to point to this implementation
+Based on insights from LMCache's architecture, this implementation:
+1. Uses chunking for efficient serialization and transfer
+2. Implements progressive data loading and saving
+3. Coordinates workers in tensor-parallel settings
+4. Uses lightweight lookups for faster cache checks
+5. Handles large model states efficiently
 """
 
 # SPDX-License-Identifier: Apache-2.0
@@ -12,10 +16,11 @@ To use it:
 import asyncio
 import hashlib
 import io
+import pickle
 import threading
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, List, Optional, Any
+from typing import TYPE_CHECKING, Dict, List, Optional, Any, Tuple
 
 import aiohttp
 import torch
@@ -55,6 +60,7 @@ class MembrainConfig:
     timeout: float = 30.0  # Default operation timeout in seconds
     max_retries: int = 3  # Maximum number of retries for operations
     retry_delay: float = 0.1  # Base delay between retries in seconds
+    max_chunk_size: int = 10 * 1024 * 1024  # 10MB max chunk size
 
 
 class MembrainClient:
@@ -77,7 +83,7 @@ class MembrainClient:
         await self._ensure_session()
         
         url = f"{self._config.endpoint}/memory/{self._config.namespace}/{key}"
-        logger.info(f"Attempting to put {key} into the store")
+        logger.debug(f"Attempting to put {key} (size: {len(value)} bytes) into the store")
         for attempt in range(self._config.max_retries):
             try:
                 async with self._session.put(url, data=value) as response:
@@ -112,10 +118,26 @@ class MembrainClient:
     async def exists(self, key: str, timeout: Optional[float] = None) -> bool:
         """Check if a key exists in Membrain."""
         try:
-            await self.get(key, timeout)
-            return True
-        except MembrainKeyError:
-            return False
+            # We use HEAD instead of GET to only check existence without transferring data
+            await self._ensure_session()
+            url = f"{self._config.endpoint}/memory/{self._config.namespace}/{key}"
+            
+            for attempt in range(self._config.max_retries):
+                try:
+                    async with self._session.head(url) as response:
+                        if response.status == 200:
+                            return True
+                        elif response.status == 404:
+                            return False
+                        else:
+                            logger.warning(f"Unexpected status {response.status} for head request")
+                            return False
+                except Exception as e:
+                    if attempt == self._config.max_retries - 1:
+                        logger.error(f"Failed to check if key {key} exists: {e}")
+                        return False
+                    await asyncio.sleep(self._config.retry_delay * (2 ** attempt))
+                    
         except Exception as e:
             logger.error(f"Error checking if key {key} exists: {e}")
             return False
@@ -266,7 +288,8 @@ class MembrainConnectorMetadata(KVConnectorMetadata):
 
 
 class MembrainConnectorV1Impl:
-    """Implementation of the Membrain connector for vLLM v1."""
+    """Implementation of the Membrain connector for vLLM v1.
+    Optimized with chunking and progressive data transfer."""
 
     def __init__(self, vllm_config: "VllmConfig", role: KVConnectorRole, 
                 parent: KVConnectorBase_V1):
@@ -300,6 +323,12 @@ class MembrainConnectorV1Impl:
             vllm_config.kv_transfer_config.get_from_extra_config(
                 "membrain_max_retries", "3")
         ))
+
+        membrain_max_chunk_size = int(os.environ.get(
+            "MEMBRAIN_MAX_CHUNK_SIZE",
+            vllm_config.kv_transfer_config.get_from_extra_config(
+                "max_chunk_size", "10485760")
+        ))  # 10MB default
         
         logger.info(f"Configuring Membrain connector with endpoint {membrain_endpoint}, namespace {membrain_namespace}")
         
@@ -307,7 +336,8 @@ class MembrainConnectorV1Impl:
             endpoint=membrain_endpoint,
             namespace=membrain_namespace,
             timeout=membrain_timeout,
-            max_retries=membrain_retries
+            max_retries=membrain_retries,
+            max_chunk_size=membrain_max_chunk_size
         )
         
         # We need to run a separate event loop for the async client
@@ -322,7 +352,6 @@ class MembrainConnectorV1Impl:
         # Additional configuration
         self._block_size = vllm_config.cache_config.block_size
         
-        import os
         self._chunk_size = int(os.environ.get(
             "MEMBRAIN_CHUNK_SIZE",
             vllm_config.kv_transfer_config.get_from_extra_config("chunk_size", "256"))
@@ -333,10 +362,23 @@ class MembrainConnectorV1Impl:
             vllm_config.kv_transfer_config.get_from_extra_config("discard_partial_chunks", "False")
         ).lower() in ('true', '1', 'yes')
         
+        # Check if we're in tensor-parallel setup
+        try:
+            import torch.distributed as dist
+            self.is_tp = dist.is_initialized() and dist.get_world_size() > 1
+            self.tp_rank = dist.get_rank() if self.is_tp else 0
+            self.tp_world_size = dist.get_world_size() if self.is_tp else 1
+        except:
+            self.is_tp = False
+            self.tp_rank = 0
+            self.tp_world_size = 1
+        
         self._model_name = vllm_config.model_config.model
         
         logger.info(f"Membrain connector configured with chunk_size={self._chunk_size}, "
-                   f"discard_partial_chunks={self._discard_partial_chunks}")
+                   f"max_chunk_size={self._membrain_config.max_chunk_size} bytes, "
+                   f"discard_partial_chunks={self._discard_partial_chunks}, "
+                   f"tp_rank={self.tp_rank}/{self.tp_world_size}")
         
         # State tracking
         self._request_trackers = {}  # request_id -> RequestTracker
@@ -361,20 +403,36 @@ class MembrainConnectorV1Impl:
     
     def _generate_key(self, token_ids: torch.Tensor) -> str:
         """Generate a unique key for the token sequence."""
-        # Format: namespace:model:tokens_hash
+        # Format: token_hash
         token_hash = hashlib.md5(str(token_ids.tolist()).encode()).hexdigest()
-        return f"{token_hash}"
+        return token_hash
+    
+    def _generate_metadata_key(self, token_ids: torch.Tensor) -> str:
+        """Generate a key for metadata lookup."""
+        base_key = self._generate_key(token_ids)
+        return f"{base_key}_meta"
+    
+    def _fast_lookup(self, token_ids: torch.Tensor) -> bool:
+        """Fast check if tokens exist in cache without loading full data."""
+        meta_key = self._generate_metadata_key(token_ids)
+        try:
+            # Only check metadata existence, much faster than loading full data
+            exists = self._run_async(self._membrain_client.exists(meta_key))
+            return exists
+        except Exception as e:
+            logger.error(f"Error during fast lookup: {e}")
+            return False
 
-    def _serialize_kv_data(self, request: ReqMeta) -> bytes:
-        """Serialize KV cache data for all layers for the given request."""
-        # Create a buffer to store the serialized data
-        buffer = io.BytesIO()
+    def _serialize_kv_data_chunked(self, request: ReqMeta) -> List[Tuple[str, bytes]]:
+        """Serialize KV cache data in manageable chunks.
         
-        # Collect all layer KV caches
+        Returns:
+            List of (key, data) tuples for each chunk.
+        """
         kvcaches = list(self.kv_caches.values())
         if not kvcaches:
             logger.warning("No KV caches available for serialization")
-            return b''
+            return []
         
         # Get dimensions for metadata
         num_layers = len(kvcaches)
@@ -382,21 +440,27 @@ class MembrainConnectorV1Impl:
         logger.info(f"Serializing KV data for {num_layers} layers, {len(request.token_ids)} tokens")
         
         try:
-            # For simplicity and robustness, use pickle instead of torch.save
-            import pickle
+            # Generate the base key
+            base_key = self._generate_key(request.token_ids)
+            chunks = []
             
-            # Prepare the data structure to serialize
-            serialized_data = {
-                "metadata": {
-                    "num_layers": num_layers,
-                    "num_tokens": len(request.token_ids),
-                    "token_ids": request.token_ids.tolist(),
-                    "model_name": self._model_name,
-                },
-                "layers": []
+            # Create metadata about the full KV cache
+            metadata = {
+                "num_layers": num_layers,
+                "num_tokens": len(request.token_ids),
+                "token_ids": request.token_ids.tolist(),
+                "model_name": self._model_name,
+                "version": "1.0",  # For future compatibility
+                "tp_world_size": self.tp_world_size,
+                "timestamp": time.time()
             }
             
-            # Add each layer's KV cache
+            # Add metadata as the first chunk
+            meta_key = f"{base_key}_meta"
+            meta_data = pickle.dumps(metadata)
+            chunks.append((meta_key, meta_data))
+            
+            # Process each layer
             for layer_idx, kv_cache in enumerate(kvcaches):
                 # Get the relevant slices from the KV cache
                 indices = request.slot_mapping
@@ -404,83 +468,140 @@ class MembrainConnectorV1Impl:
                 # Extract tensor for specific slots
                 kv_slice = torch.index_select(kv_cache, 1, indices.cuda())
                 
-                # Instead of direct numpy conversion which fails for BFloat16, use PyTorch serialization
-                tensor_buffer = io.BytesIO()
-                torch.save(kv_slice.cpu(), tensor_buffer)
-                tensor_buffer.seek(0)
+                # Convert to CPU and half precision to save space and memory
+                kv_slice_cpu = kv_slice.cpu()
+                if kv_slice_cpu.dtype not in (torch.float16, torch.bfloat16, torch.int8):
+                    kv_slice_cpu = kv_slice_cpu.half()
                 
-                # Add to the layers list with serialized tensor data
-                serialized_data["layers"].append({
+                # Add layer metadata
+                layer_meta_key = f"{base_key}_layer_{layer_idx}_meta"
+                layer_meta = {
                     "layer_idx": layer_idx,
-                    "shape": list(kv_slice.shape),
-                    "dtype": str(kv_slice.dtype),
-                    "tensor_bytes": tensor_buffer.read(),
-                })
+                    "shape": list(kv_slice_cpu.shape),
+                    "dtype": str(kv_slice_cpu.dtype),
+                }
+                chunks.append((layer_meta_key, pickle.dumps(layer_meta)))
+                
+                # Serialize the tensor
+                serialized_tensor = io.BytesIO()
+                torch.save(kv_slice_cpu, serialized_tensor)
+                serialized_tensor.seek(0)
+                tensor_data = serialized_tensor.read()
+                
+                # Split large tensor data into smaller chunks
+                max_chunk_size = self._membrain_config.max_chunk_size
+                chunk_count = (len(tensor_data) + max_chunk_size - 1) // max_chunk_size
+                
+                # Store layer chunk count
+                layer_chunks_meta_key = f"{base_key}_layer_{layer_idx}_chunks_meta"
+                layer_chunks_meta = {
+                    "chunk_count": chunk_count,
+                    "total_size": len(tensor_data)
+                }
+                chunks.append((layer_chunks_meta_key, pickle.dumps(layer_chunks_meta)))
+                
+                # Create and store tensor chunks
+                for chunk_idx in range(chunk_count):
+                    start = chunk_idx * max_chunk_size
+                    end = min((chunk_idx + 1) * max_chunk_size, len(tensor_data))
+                    chunk_data = tensor_data[start:end]
+                    
+                    chunk_key = f"{base_key}_layer_{layer_idx}_chunk_{chunk_idx}"
+                    chunks.append((chunk_key, chunk_data))
             
-            # Serialize the entire structure
-            pickle.dump(serialized_data, buffer, protocol=pickle.HIGHEST_PROTOCOL)
-            
-            # Get the bytes from the buffer
-            buffer.seek(0)
-            data = buffer.read()
-            logger.info(f"Serialized KV data size: {len(data)} bytes")
-            return data
+            logger.info(f"Serialized KV data into {len(chunks)} chunks")
+            return chunks
             
         except Exception as e:
-            logger.error(f"Error during serialization: {e}")
+            logger.error(f"Error during chunked serialization: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            return b''
+            return []
 
-    def _deserialize_kv_data(self, data: bytes, kvcaches: list, slot_mapping: torch.Tensor) -> bool:
-        """Deserialize KV cache data and load it into the provided kvcaches list."""
-        if not data:
-            logger.warning("Empty data provided for deserialization")
+    def _store_chunked_data(self, chunks: List[Tuple[str, bytes]]) -> bool:
+        """Store serialized data chunks in Membrain."""
+        if not chunks:
+            logger.warning("No chunks to store")
             return False
         
-        # Create a buffer from the bytes
-        buffer = io.BytesIO(data)
-        
         try:
-            logger.info(f"Attempting to deserialize data of size: {len(data)} bytes")
+            # Store each chunk
+            success_count = 0
+            for key, data in chunks:
+                try:
+                    self._run_async(self._membrain_client.put(key, data))
+                    success_count += 1
+                except Exception as e:
+                    logger.error(f"Error storing chunk {key}: {e}")
             
-            # Use pickle for deserialization to match our serialization
-            import pickle
-            deserialized_data = pickle.load(buffer)
+            logger.info(f"Successfully stored {success_count}/{len(chunks)} chunks")
+            return success_count == len(chunks)
+        except Exception as e:
+            logger.error(f"Error storing chunked data: {e}")
+            return False
+
+    def _load_chunked_data(self, key_base: str, kvcaches: list, slot_mapping: torch.Tensor) -> bool:
+        """Load and process serialized KV data chunks from Membrain."""
+        try:
+            # First get metadata
+            meta_key = f"{key_base}_meta"
+            meta_bytes = self._run_async(self._membrain_client.get(meta_key))
+            metadata = pickle.loads(meta_bytes)
             
-            # Extract metadata
-            metadata = deserialized_data["metadata"]
             num_layers = metadata["num_layers"]
             num_tokens = metadata["num_tokens"]
             
-            logger.info(f"Deserialized metadata: {num_layers} layers, {num_tokens} tokens")
+            logger.info(f"Loading KV data: {num_layers} layers, {num_tokens} tokens from {key_base}")
             
-            # Check if we have enough layers
+            # Check if number of layers matches
             if num_layers != len(kvcaches):
                 logger.warning(f"Layer count mismatch: {num_layers} vs {len(kvcaches)}")
                 return False
-            
-            # Process each layer
-            for layer_info in deserialized_data["layers"]:
-                layer_idx = layer_info["layer_idx"]
                 
-                # Load the tensor from bytes
-                tensor_buffer = io.BytesIO(layer_info["tensor_bytes"])
-                kv_slice = torch.load(tensor_buffer).cuda()
+            # Load each layer
+            for layer_idx in range(num_layers):
+                # Get layer metadata
+                layer_meta_key = f"{key_base}_layer_{layer_idx}_meta"
+                layer_meta_bytes = self._run_async(self._membrain_client.get(layer_meta_key))
+                layer_meta = pickle.loads(layer_meta_bytes)
                 
-                # Insert into the correct positions
+                # Get layer chunks metadata
+                chunks_meta_key = f"{key_base}_layer_{layer_idx}_chunks_meta"
+                chunks_meta_bytes = self._run_async(self._membrain_client.get(chunks_meta_key))
+                chunks_meta = pickle.loads(chunks_meta_bytes)
+                
+                chunk_count = chunks_meta["chunk_count"]
+                total_size = chunks_meta["total_size"]
+                
+                # Load all chunks for this layer
+                buffer = bytearray(total_size)
+                for chunk_idx in range(chunk_count):
+                    chunk_key = f"{key_base}_layer_{layer_idx}_chunk_{chunk_idx}"
+                    chunk_data = self._run_async(self._membrain_client.get(chunk_key))
+                    
+                    # Calculate position in the buffer
+                    max_chunk_size = self._membrain_config.max_chunk_size
+                    start = chunk_idx * max_chunk_size
+                    buffer[start:start + len(chunk_data)] = chunk_data
+                
+                # Deserialize the tensor
+                tensor_buffer = io.BytesIO(buffer)
+                kv_slice = torch.load(tensor_buffer)
+                
+                # Move to GPU and insert into the KV cache
+                kv_slice = kv_slice.cuda()
                 dst_cache = kvcaches[layer_idx]
                 
-                # Use index_copy_ to place the data in the right slots
+                # Use index_copy_ to place the data in the correct slots
                 dst_cache.index_copy_(1, slot_mapping.cuda(), kv_slice)
                 
                 logger.debug(f"Successfully loaded layer {layer_idx}")
             
-            logger.info(f"Successfully deserialized all {num_layers} layers")
+            logger.info(f"Successfully loaded all {num_layers} layers")
             return True
             
         except Exception as e:
-            logger.error(f"Error deserializing KV cache: {e}")
+            logger.error(f"Error loading chunked data: {e}")
             import traceback
             logger.error(traceback.format_exc())
             return False
@@ -508,6 +629,10 @@ class MembrainConnectorV1Impl:
             forward_context (ForwardContext): the forward context.
             **kwargs: additional arguments for the load operation
         """
+        # Skip if we're in producer-only mode
+        if self.kv_role == "kv_producer":
+            return
+            
         # Initialize KV caches if not done already
         if len(self.kv_caches) == 0:
             self._init_kv_caches_from_forward_context(forward_context)
@@ -534,28 +659,29 @@ class MembrainConnectorV1Impl:
             if request.load_spec is None or not request.load_spec.can_load:
                 continue
                 
-            # Generate key and retrieve from Membrain
+            # Generate key and check if it exists in Membrain
             key = self._generate_key(request.token_ids)
             
             try:
-                # Retrieve KV cache data from Membrain
-                kv_data = self._run_async(self._membrain_client.get(key))
+                # Use the faster metadata existence check
+                if not self._fast_lookup(request.token_ids):
+                    logger.info(f"No cached data found for request {request.req_id}")
+                    continue
                 
-                if kv_data:
-                    # Deserialize and load into vLLM's KV cache
-                    success = self._deserialize_kv_data(
-                        kv_data, kvcaches, request.slot_mapping
+                # Load and process chunked data
+                success = self._load_chunked_data(
+                    key, kvcaches, request.slot_mapping
+                )
+                
+                if success:
+                    logger.info(
+                        f"Loaded KV cache for request {request.req_id} with "
+                        f"{len(request.token_ids)} tokens"
                     )
-                    
-                    if success:
-                        logger.info(
-                            f"Loaded KV cache for request {request.req_id} with "
-                            f"{len(request.token_ids)} tokens"
-                        )
-                    else:
-                        logger.error(
-                            f"Failed to load KV cache for request {request.req_id}"
-                        )
+                else:
+                    logger.error(
+                        f"Failed to load KV cache for request {request.req_id}"
+                    )
             except Exception as e:
                 logger.error(f"Error loading KV cache from Membrain: {e}")
 
@@ -580,6 +706,10 @@ class MembrainConnectorV1Impl:
             attn_metadata (AttentionMetadata): the attention metadata.
             **kwargs: additional arguments for the save operation.
         """
+        # Skip if we're a consumer-only node
+        if self.kv_role == "kv_consumer":
+            return
+            
         # Store the layer's KV cache for later serialization in wait_for_save
         if layer_name not in self.kv_caches:
             self.kv_caches[layer_name] = kv_layer
@@ -590,6 +720,11 @@ class MembrainConnectorV1Impl:
         """
         # Skip if we're a consumer-only node
         if self.kv_role == "kv_consumer":
+            return
+            
+        # In TP setup, only rank 0 handles serialization
+        if self.is_tp and self.tp_rank != 0:
+            logger.info(f"TP rank {self.tp_rank} skipping save operation")
             return
             
         # Get connector metadata
@@ -605,26 +740,29 @@ class MembrainConnectorV1Impl:
         for request in connector_metadata.requests:
             save_spec = request.save_spec
             if save_spec is None or not save_spec.can_save:
+                logger.debug(f"Skipping save for request {request.req_id} (cannot save)")
                 continue
                 
-            # Serialize the KV cache data
-            kv_data = self._serialize_kv_data(request)
-            if not kv_data:
-                logger.warning(f"No KV data to save for request {request.req_id}")
+            # Check if we already have this cached (fast check to avoid redundant work)
+            if self._fast_lookup(request.token_ids):
+                logger.info(f"KV cache already exists for request {request.req_id}, skipping save")
                 continue
                 
-            # Generate key for storage
-            key = self._generate_key(request.token_ids)
-            
-            try:
-                # Save to Membrain
-                self._run_async(self._membrain_client.put(key, kv_data))
+            # Serialize the KV cache data in chunks
+            chunks = self._serialize_kv_data_chunked(request)
+            if not chunks:
+                logger.warning(f"No KV data chunks created for request {request.req_id}")
+                continue
+                
+            # Store all chunks
+            success = self._store_chunked_data(chunks)
+            if success:
                 logger.info(
                     f"Saved KV cache for request {request.req_id} with "
-                    f"{len(request.token_ids)} tokens"
+                    f"{len(request.token_ids)} tokens in {len(chunks)} chunks"
                 )
-            except Exception as e:
-                logger.error(f"Error saving KV cache to Membrain: {e}")
+            else:
+                logger.error(f"Failed to save all chunks for request {request.req_id}")
     
     # ==============================
     # Scheduler-side methods
@@ -645,47 +783,43 @@ class MembrainConnectorV1Impl:
         Returns:
             int: the number of tokens that can be loaded from Membrain beyond what is already computed.
         """
+        # Skip lookup for producer-only nodes
         if self.kv_role == "kv_producer":
             return 0
             
         token_ids = torch.tensor(request.prompt_token_ids)
-        key = self._generate_key(token_ids)
         
-        # Check if the KV cache exists in Membrain
-        try:
-            exists = self._run_async(self._membrain_client.exists(key))
-            if exists:
-                # If exists, the entire token sequence is available
-                num_external_hit_tokens = len(token_ids)
-                
-                # When prompt length is exactly divisible by the block size,
-                # we need to recompute the last token to ensure correctness
-                if num_external_hit_tokens == request.num_tokens:
-                    num_external_hit_tokens -= 1
-                    
-                need_to_allocate = num_external_hit_tokens - num_computed_tokens
-                
-                logger.info(
-                    f"Request {request.request_id}: Total tokens {request.num_tokens}, "
-                    f"Membrain hit tokens: {num_external_hit_tokens}, "
-                    f"Need to load: {need_to_allocate}"
-                )
-                
-                if need_to_allocate <= 0:
-                    return 0
-                    
-                # Store the load spec for later use
-                self._load_specs[request.request_id] = LoadSpec(
-                    vllm_cached_tokens=num_computed_tokens,
-                    membrain_cached_tokens=num_external_hit_tokens,
-                    can_load=False
-                )
-                
-                return need_to_allocate
-        except Exception as e:
-            logger.error(f"Error checking Membrain for key {key}: {e}")
+        # Fast lookup using metadata
+        if not self._fast_lookup(token_ids):
+            return 0
+            
+        # If exists, the entire token sequence is available
+        num_external_hit_tokens = len(token_ids)
         
-        return 0
+        # When prompt length is exactly divisible by the block size,
+        # we need to recompute the last token to ensure correctness
+        if num_external_hit_tokens == request.num_tokens:
+            num_external_hit_tokens -= 1
+            
+        need_to_allocate = num_external_hit_tokens - num_computed_tokens
+        
+        logger.info(
+            f"Request {request.request_id}: Total tokens {request.num_tokens}, "
+            f"Membrain hit tokens: {num_external_hit_tokens}, "
+            f"Need to load: {need_to_allocate}"
+        )
+        
+        if need_to_allocate <= 0:
+            return 0
+            
+        # Store the load spec for later use
+        self._load_specs[request.request_id] = LoadSpec(
+            vllm_cached_tokens=num_computed_tokens,
+            membrain_cached_tokens=num_external_hit_tokens,
+            can_load=False
+        )
+        
+        return need_to_allocate
 
     def update_state_after_alloc(self, request: "Request", num_external_tokens: int):
         """

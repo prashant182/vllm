@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-membrain
+  namespace: vllm-benchmark
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vllm-membrain
+  template:
+    metadata:
+      labels:
+        app: vllm-membrain
+    spec:
+      containers:
+      - name: vllm
+        image: 590183691098.dkr.ecr.us-east-1.amazonaws.com/zeus:vllm-membrain1
+        imagePullPolicy: Always
+        resources:
+          limits:
+            nvidia.com/gpu: 8  # Adjust based on p5.48xlarge configuration
+          requests:
+            nvidia.com/gpu: 8
+            memory: "300Gi"
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: VLLM_USE_V1
+          value: "1"
+        - name: MEMBRAIN_ENDPOINT
+          value: "http://membrain-aggregator.membrain:9201"  # Adjust to match actual Membrain service in the cluster
+        - name: MEMBRAIN_NAMESPACE
+          value: "vllm-benchmark"
+        - name: MEMBRAIN_TIMEOUT
+          value: "500.0"
+        - name: MEMBRAIN_MAX_RETRIES
+          value: "3"
+        - name: MEMBRAIN_CHUNK_SIZE
+          value: "256"
+        - name: NCCL_DEBUG
+          value: "INFO"
+        - name: NCCL_IB_DISABLE
+          value: "1"
+        - name: NCCL_P2P_DISABLE
+          value: "1"
+        - name: VLLM_LOGGING_LEVEL
+          value: "DEBUG"
+        - name: VLLM_CONFIGURE_LOGGING
+          value: "1"
+        volumeMounts:
+        - name: models-volume
+          mountPath: "/models"
+          readOnly: true
+        - name: dshm
+          mountPath: /dev/shm
+        command:
+        - "/usr/bin/python3"
+        - "-m"
+        - "vllm.entrypoints.openai.api_server"
+        - "--model"
+        - "/models"
+        - "--tensor-parallel-size"  # Using TP for large model
+        - "4"  # Adjust based on GPU count
+        - "--host"
+        - "0.0.0.0"
+        - "--port"
+        - "8000"
+        - "--kv-transfer-config"
+        - '{"kv_connector":"MembrainConnectorV1", "kv_role":"kv_both", "kv_connector_extra_config": {"membrain_endpoint":"http://membrain-aggregator.membrain:9201", "membrain_namespace":"vllm-benchmark", "chunk_size":256}}'
+        - "--enable-prefix-caching"  # Enable prefix caching
+        - "--uvicorn-log-level"
+        - "debug"
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "16Gi"
+      - name: models-volume
+        hostPath:
+          path: /mnt/nvme_raid/vllm-data
+          type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-membrain-service
+  namespace: vllm-benchmark
+spec:
+  selector:
+    app: vllm-membrain
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: ClusterIP
