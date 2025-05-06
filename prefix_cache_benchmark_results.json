@@ -1,0 +1,833 @@
+{
+  "config": {
+    "api_url": "http://localhost:8084/v1/completions",
+    "model": "/models",
+    "max_tokens": 128,
+    "temperature": 0.7,
+    "num_requests": 100,
+    "concurrency": 10,
+    "repetition_ratio": 0.5
+  },
+  "metrics": {
+    "total_requests": 100,
+    "successful_requests": 100,
+    "failed_requests": 0,
+    "success_rate": 1.0,
+    "avg_ttft": 10.660637621879578,
+    "median_ttft": 10.655685424804688,
+    "p90_ttft": 17.623936152458207,
+    "p95_ttft": 19.3637678027153,
+    "p99_ttft": 19.36391860485077,
+    "avg_total_time": 10.660663986206055,
+    "median_total_time": 10.655733108520508,
+    "avg_throughput": 6655690.75080794,
+    "unique_prompts": 25,
+    "repeated_prompts": 75,
+    "first_occurrence_avg_ttft": 6.210832281112671,
+    "repeated_occurrence_avg_ttft": 12.14390606880188,
+    "ttft_improvement_ratio": 0.5114361265580369,
+    "ttft_improvement_ms": -5933.073787689208
+  },
+  "raw_results": [
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks?",
+      "prompt_length": 10,
+      "ttft": 1.9569177627563477,
+      "total_time": 1.9569504261016846,
+      "throughput": 3918765.7810218977,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs.",
+      "prompt_length": 11,
+      "ttft": 1.956270694732666,
+      "total_time": 1.956284999847412,
+      "throughput": 8947848.533333333,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks?",
+      "prompt_length": 10,
+      "ttft": 1.9550185203552246,
+      "total_time": 1.955075740814209,
+      "throughput": 2236962.1333333333,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs. Provide examples.",
+      "prompt_length": 13,
+      "ttft": 1.9559667110443115,
+      "total_time": 1.9559917449951172,
+      "throughput": 5113056.304761905,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models.",
+      "prompt_length": 9,
+      "ttft": 1.9550397396087646,
+      "total_time": 1.9550743103027344,
+      "throughput": 3702558.0137931034,
+      "success": true
+    },
+    {
+      "prompt": "How does continuous batching improve LLM inference throughput? Provide examples.",
+      "prompt_length": 10,
+      "ttft": 1.9559288024902344,
+      "total_time": 1.9559440612792969,
+      "throughput": 8388608.0,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models.",
+      "prompt_length": 9,
+      "ttft": 1.9559261798858643,
+      "total_time": 1.9559392929077148,
+      "throughput": 9761289.309090909,
+      "success": true
+    },
+    {
+      "prompt": "What are the main differences between Llama and GPT models? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 1.938689947128296,
+      "total_time": 1.9388232231140137,
+      "throughput": 960413.0805008945,
+      "success": true
+    },
+    {
+      "prompt": "What are the main differences between Llama and GPT models?",
+      "prompt_length": 10,
+      "ttft": 1.9559600353240967,
+      "total_time": 1.95597243309021,
+      "throughput": 10324440.615384616,
+      "success": true
+    },
+    {
+      "prompt": "How does continuous batching improve LLM inference throughput? Compare with other approaches.",
+      "prompt_length": 12,
+      "ttft": 1.9558794498443604,
+      "total_time": 1.9558930397033691,
+      "throughput": 9418787.92982456,
+      "success": true
+    },
+    {
+      "prompt": "Describe the key features of vLLM's paged attention mechanism.",
+      "prompt_length": 9,
+      "ttft": 3.8744242191314697,
+      "total_time": 3.874481439590454,
+      "throughput": 2236962.1333333333,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks?",
+      "prompt_length": 10,
+      "ttft": 3.89137601852417,
+      "total_time": 3.8914380073547363,
+      "throughput": 2064888.1230769232,
+      "success": true
+    },
+    {
+      "prompt": "What are the main differences between Llama and GPT models? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 3.89155912399292,
+      "total_time": 3.8915722370147705,
+      "throughput": 9761289.309090909,
+      "success": true
+    },
+    {
+      "prompt": "What are the challenges in serving large language models efficiently? Compare with other approaches.",
+      "prompt_length": 14,
+      "ttft": 3.8923466205596924,
+      "total_time": 3.8923611640930176,
+      "throughput": 8801162.49180328,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of KV caching in language model inference.",
+      "prompt_length": 10,
+      "ttft": 3.890610933303833,
+      "total_time": 3.89066481590271,
+      "throughput": 2375535.0088495575,
+      "success": true
+    },
+    {
+      "prompt": "How does continuous batching improve LLM inference throughput? Compare with other approaches.",
+      "prompt_length": 12,
+      "ttft": 3.892252206802368,
+      "total_time": 3.8922762870788574,
+      "throughput": 5315553.584158416,
+      "success": true
+    },
+    {
+      "prompt": "How does continuous batching improve LLM inference throughput? Provide examples.",
+      "prompt_length": 10,
+      "ttft": 3.8914713859558105,
+      "total_time": 3.891489267349243,
+      "throughput": 7158278.826666667,
+      "success": true
+    },
+    {
+      "prompt": "How does continuous batching improve LLM inference throughput? Provide examples.",
+      "prompt_length": 10,
+      "ttft": 3.892301321029663,
+      "total_time": 3.8923158645629883,
+      "throughput": 8801162.49180328,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 3.8923726081848145,
+      "total_time": 3.8923840522766113,
+      "throughput": 11184810.666666666,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 3.8915066719055176,
+      "total_time": 3.891521453857422,
+      "throughput": 8659208.258064516,
+      "success": true
+    },
+    {
+      "prompt": "Summarize the key innovations in the Llama model architecture. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 5.809382438659668,
+      "total_time": 5.8094470500946045,
+      "throughput": 1981073.47601476,
+      "success": true
+    },
+    {
+      "prompt": "What are the challenges in serving large language models efficiently? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 5.825937986373901,
+      "total_time": 5.825979948043823,
+      "throughput": 3050402.909090909,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs. Provide examples.",
+      "prompt_length": 13,
+      "ttft": 5.826030731201172,
+      "total_time": 5.826051235198975,
+      "throughput": 6242685.023255814,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs. Compare with other approaches.",
+      "prompt_length": 15,
+      "ttft": 5.826824188232422,
+      "total_time": 5.826842546463013,
+      "throughput": 6972349.506493507,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 5.826967000961304,
+      "total_time": 5.826979637145996,
+      "throughput": 10129639.849056603,
+      "success": true
+    },
+    {
+      "prompt": "How does attention mechanism work in transformer models?",
+      "prompt_length": 8,
+      "ttft": 5.826869964599609,
+      "total_time": 5.826894521713257,
+      "throughput": 5212338.95145631,
+      "success": true
+    },
+    {
+      "prompt": "How does continuous batching improve LLM inference throughput? Provide examples.",
+      "prompt_length": 10,
+      "ttft": 5.826921224594116,
+      "total_time": 5.8269360065460205,
+      "throughput": 8659208.258064516,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of KV caching in language model inference. Provide examples.",
+      "prompt_length": 12,
+      "ttft": 5.827038764953613,
+      "total_time": 5.827051162719727,
+      "throughput": 10324440.615384616,
+      "success": true
+    },
+    {
+      "prompt": "Describe the key features of vLLM's paged attention mechanism.",
+      "prompt_length": 9,
+      "ttft": 5.827000856399536,
+      "total_time": 5.827014684677124,
+      "throughput": 9256395.034482758,
+      "success": true
+    },
+    {
+      "prompt": "How does attention mechanism work in transformer models?",
+      "prompt_length": 8,
+      "ttft": 5.8267552852630615,
+      "total_time": 5.826780080795288,
+      "throughput": 5162220.307692308,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks?",
+      "prompt_length": 10,
+      "ttft": 7.745185136795044,
+      "total_time": 7.745244979858398,
+      "throughput": 2138927.93625498,
+      "success": true
+    },
+    {
+      "prompt": "How does continuous batching improve LLM inference throughput? Compare with other approaches.",
+      "prompt_length": 12,
+      "ttft": 7.76326584815979,
+      "total_time": 7.76327919960022,
+      "throughput": 9586980.57142857,
+      "success": true
+    },
+    {
+      "prompt": "What are the challenges in serving large language models efficiently? Compare with other approaches.",
+      "prompt_length": 14,
+      "ttft": 7.762190580368042,
+      "total_time": 7.762238264083862,
+      "throughput": 2684354.56,
+      "success": true
+    },
+    {
+      "prompt": "Summarize the key innovations in the Llama model architecture. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 7.763860702514648,
+      "total_time": 7.763874530792236,
+      "throughput": 9256395.034482758,
+      "success": true
+    },
+    {
+      "prompt": "How does continuous batching improve LLM inference throughput? Provide examples.",
+      "prompt_length": 10,
+      "ttft": 7.762298107147217,
+      "total_time": 7.762328863143921,
+      "throughput": 4161790.015503876,
+      "success": true
+    },
+    {
+      "prompt": "How does attention mechanism work in transformer models?",
+      "prompt_length": 8,
+      "ttft": 7.763129949569702,
+      "total_time": 7.763174533843994,
+      "throughput": 2870967.443850267,
+      "success": true
+    },
+    {
+      "prompt": "How does continuous batching improve LLM inference throughput? Provide examples.",
+      "prompt_length": 10,
+      "ttft": 7.763771295547485,
+      "total_time": 7.763792037963867,
+      "throughput": 6170930.022988506,
+      "success": true
+    },
+    {
+      "prompt": "What are the challenges in serving large language models efficiently?",
+      "prompt_length": 10,
+      "ttft": 7.763887405395508,
+      "total_time": 7.7639000415802,
+      "throughput": 10129639.849056603,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models.",
+      "prompt_length": 9,
+      "ttft": 7.763206958770752,
+      "total_time": 7.763227701187134,
+      "throughput": 6170930.022988506,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs. Compare with other approaches.",
+      "prompt_length": 15,
+      "ttft": 7.763810634613037,
+      "total_time": 7.7638256549835205,
+      "throughput": 8521760.507936507,
+      "success": true
+    },
+    {
+      "prompt": "Summarize the key innovations in the Llama model architecture. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 9.679124593734741,
+      "total_time": 9.679162979125977,
+      "throughput": 3334601.9378881985,
+      "success": true
+    },
+    {
+      "prompt": "What are the challenges in serving large language models efficiently? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 9.697014808654785,
+      "total_time": 9.697052478790283,
+      "throughput": 3397917.164556962,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of KV caching in language model inference.",
+      "prompt_length": 10,
+      "ttft": 9.697777032852173,
+      "total_time": 9.697789192199707,
+      "throughput": 10526880.62745098,
+      "success": true
+    },
+    {
+      "prompt": "How does continuous batching improve LLM inference throughput? Provide examples.",
+      "prompt_length": 10,
+      "ttft": 9.697687864303589,
+      "total_time": 9.697709798812866,
+      "throughput": 5835553.391304348,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks?",
+      "prompt_length": 10,
+      "ttft": 9.697809219360352,
+      "total_time": 9.697822093963623,
+      "throughput": 9942053.925925925,
+      "success": true
+    },
+    {
+      "prompt": "How does attention mechanism work in transformer models?",
+      "prompt_length": 8,
+      "ttft": 9.697608947753906,
+      "total_time": 9.697628259658813,
+      "throughput": 6628035.950617284,
+      "success": true
+    },
+    {
+      "prompt": "Summarize the key innovations in the Llama model architecture. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 9.69773554801941,
+      "total_time": 9.697749853134155,
+      "throughput": 8947848.533333333,
+      "success": true
+    },
+    {
+      "prompt": "Summarize the key innovations in the Llama model architecture. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 9.69652533531189,
+      "total_time": 9.69657564163208,
+      "throughput": 2544411.9052132703,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs.",
+      "prompt_length": 11,
+      "ttft": 9.697836637496948,
+      "total_time": 9.697849750518799,
+      "throughput": 9761289.309090909,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models. Provide examples.",
+      "prompt_length": 11,
+      "ttft": 9.69786810874939,
+      "total_time": 9.697880744934082,
+      "throughput": 10129639.849056603,
+      "success": true
+    },
+    {
+      "prompt": "What are the main differences between Llama and GPT models?",
+      "prompt_length": 10,
+      "ttft": 11.613502740859985,
+      "total_time": 11.613585472106934,
+      "throughput": 1547178.4207492794,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks? Compare with other approaches.",
+      "prompt_length": 14,
+      "ttft": 11.631031036376953,
+      "total_time": 11.631043195724487,
+      "throughput": 10526880.62745098,
+      "success": true
+    },
+    {
+      "prompt": "What are the main differences between Llama and GPT models? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 11.62998914718628,
+      "total_time": 11.630020380020142,
+      "throughput": 4098251.236641221,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks? Compare with other approaches.",
+      "prompt_length": 14,
+      "ttft": 11.629884719848633,
+      "total_time": 11.629926919937134,
+      "throughput": 3033168.9943502825,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs. Compare with other approaches.",
+      "prompt_length": 15,
+      "ttft": 11.63091492652893,
+      "total_time": 11.63093113899231,
+      "throughput": 7895160.470588235,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks?",
+      "prompt_length": 10,
+      "ttft": 11.630807161331177,
+      "total_time": 11.630829811096191,
+      "throughput": 5651272.757894737,
+      "success": true
+    },
+    {
+      "prompt": "How does attention mechanism work in transformer models?",
+      "prompt_length": 8,
+      "ttft": 11.630858659744263,
+      "total_time": 11.630881547927856,
+      "throughput": 5592405.333333333,
+      "success": true
+    },
+    {
+      "prompt": "How does attention mechanism work in transformer models?",
+      "prompt_length": 8,
+      "ttft": 11.630951166152954,
+      "total_time": 11.630964756011963,
+      "throughput": 9418787.92982456,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks?",
+      "prompt_length": 10,
+      "ttft": 11.630985975265503,
+      "total_time": 11.63099980354309,
+      "throughput": 9256395.034482758,
+      "success": true
+    },
+    {
+      "prompt": "Summarize the key innovations in the Llama model architecture. Provide examples.",
+      "prompt_length": 11,
+      "ttft": 11.631048679351807,
+      "total_time": 11.631060123443604,
+      "throughput": 11184810.666666666,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models.",
+      "prompt_length": 9,
+      "ttft": 13.547303199768066,
+      "total_time": 13.547372341156006,
+      "throughput": 1851279.0068965517,
+      "success": true
+    },
+    {
+      "prompt": "Summarize the key innovations in the Llama model architecture.",
+      "prompt_length": 9,
+      "ttft": 13.56413745880127,
+      "total_time": 13.564165115356445,
+      "throughput": 4628197.517241379,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks? Compare with other approaches.",
+      "prompt_length": 14,
+      "ttft": 13.563809633255005,
+      "total_time": 13.563840389251709,
+      "throughput": 4161790.015503876,
+      "success": true
+    },
+    {
+      "prompt": "Summarize the key innovations in the Llama model architecture. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 13.564743518829346,
+      "total_time": 13.564764499664307,
+      "throughput": 6100805.818181818,
+      "success": true
+    },
+    {
+      "prompt": "What are the challenges in serving large language models efficiently? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 13.564192295074463,
+      "total_time": 13.564212560653687,
+      "throughput": 6316128.376470588,
+      "success": true
+    },
+    {
+      "prompt": "What are the main differences between Llama and GPT models? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 13.564789295196533,
+      "total_time": 13.564804553985596,
+      "throughput": 8388608.0,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of KV caching in language model inference.",
+      "prompt_length": 10,
+      "ttft": 13.564866542816162,
+      "total_time": 13.564878463745117,
+      "throughput": 10737418.24,
+      "success": true
+    },
+    {
+      "prompt": "What are the main differences between Llama and GPT models? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 13.564929723739624,
+      "total_time": 13.564940690994263,
+      "throughput": 11671106.782608695,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks?",
+      "prompt_length": 10,
+      "ttft": 13.564825296401978,
+      "total_time": 13.564842700958252,
+      "throughput": 7354396.05479452,
+      "success": true
+    },
+    {
+      "prompt": "What are the main differences between Llama and GPT models? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 13.564894914627075,
+      "total_time": 13.564907312393188,
+      "throughput": 10324440.615384616,
+      "success": true
+    },
+    {
+      "prompt": "What are the main differences between Llama and GPT models? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 15.479784965515137,
+      "total_time": 15.479825973510742,
+      "throughput": 3121342.511627907,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models. Provide examples.",
+      "prompt_length": 11,
+      "ttft": 15.496527671813965,
+      "total_time": 15.49657130241394,
+      "throughput": 2933720.830601093,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks?",
+      "prompt_length": 10,
+      "ttft": 15.497884035110474,
+      "total_time": 15.497896194458008,
+      "throughput": 10526880.62745098,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 15.497807264328003,
+      "total_time": 15.497821807861328,
+      "throughput": 8801162.49180328,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 15.49784517288208,
+      "total_time": 15.49785828590393,
+      "throughput": 9761289.309090909,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of KV caching in language model inference.",
+      "prompt_length": 10,
+      "ttft": 15.497063875198364,
+      "total_time": 15.497102975845337,
+      "throughput": 3273603.1219512196,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 15.498507022857666,
+      "total_time": 15.49852728843689,
+      "throughput": 6316128.376470588,
+      "success": true
+    },
+    {
+      "prompt": "What are the challenges in serving large language models efficiently?",
+      "prompt_length": 10,
+      "ttft": 15.498554229736328,
+      "total_time": 15.498575210571289,
+      "throughput": 6100805.818181818,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs. Compare with other approaches.",
+      "prompt_length": 15,
+      "ttft": 15.498609781265259,
+      "total_time": 15.498626470565796,
+      "throughput": 7669584.457142857,
+      "success": true
+    },
+    {
+      "prompt": "What are the main differences between Llama and GPT models? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 15.497748613357544,
+      "total_time": 15.497771978378296,
+      "throughput": 5478274.6122448975,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 17.414233446121216,
+      "total_time": 17.41429090499878,
+      "throughput": 2227680.132780083,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs. Compare with other approaches.",
+      "prompt_length": 15,
+      "ttft": 17.431522846221924,
+      "total_time": 17.43155288696289,
+      "throughput": 4260880.253968254,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks?",
+      "prompt_length": 10,
+      "ttft": 17.431675672531128,
+      "total_time": 17.431690454483032,
+      "throughput": 8659208.258064516,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs. Provide examples.",
+      "prompt_length": 13,
+      "ttft": 17.432478666305542,
+      "total_time": 17.43249249458313,
+      "throughput": 9256395.034482758,
+      "success": true
+    },
+    {
+      "prompt": "How does attention mechanism work in transformer models? Provide examples.",
+      "prompt_length": 10,
+      "ttft": 17.43105936050415,
+      "total_time": 17.43109703063965,
+      "throughput": 3397917.164556962,
+      "success": true
+    },
+    {
+      "prompt": "Summarize the key innovations in the Llama model architecture. Provide examples.",
+      "prompt_length": 11,
+      "ttft": 17.431582927703857,
+      "total_time": 17.43160104751587,
+      "throughput": 7064090.947368421,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs. Compare with other approaches.",
+      "prompt_length": 15,
+      "ttft": 17.432368993759155,
+      "total_time": 17.432402849197388,
+      "throughput": 3780781.0704225353,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs. Provide examples.",
+      "prompt_length": 13,
+      "ttft": 17.432433605194092,
+      "total_time": 17.43244957923889,
+      "throughput": 8012998.686567164,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models. Provide examples.",
+      "prompt_length": 11,
+      "ttft": 17.432509422302246,
+      "total_time": 17.432522296905518,
+      "throughput": 9942053.925925925,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of KV caching in language model inference. Provide examples.",
+      "prompt_length": 12,
+      "ttft": 17.431622982025146,
+      "total_time": 17.431638717651367,
+      "throughput": 8134407.757575758,
+      "success": true
+    },
+    {
+      "prompt": "What are the main differences between Llama and GPT models? Provide examples.",
+      "prompt_length": 12,
+      "ttft": 19.346776723861694,
+      "total_time": 19.346850872039795,
+      "throughput": 1726273.0289389067,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of TTFT (Time To First Token) in LLMs.",
+      "prompt_length": 11,
+      "ttft": 19.363765716552734,
+      "total_time": 19.36378312110901,
+      "throughput": 7354396.05479452,
+      "success": true
+    },
+    {
+      "prompt": "Explain the concept of prefix caching in language models. Provide examples.",
+      "prompt_length": 11,
+      "ttft": 19.363322496414185,
+      "total_time": 19.363353490829468,
+      "throughput": 4129776.2461538464,
+      "success": true
+    },
+    {
+      "prompt": "Describe the key features of vLLM's paged attention mechanism. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 19.363807439804077,
+      "total_time": 19.36382293701172,
+      "throughput": 8259552.492307693,
+      "success": true
+    },
+    {
+      "prompt": "Summarize the key innovations in the Llama model architecture. Compare with other approaches.",
+      "prompt_length": 13,
+      "ttft": 19.36401915550232,
+      "total_time": 19.364036560058594,
+      "throughput": 7354396.05479452,
+      "success": true
+    },
+    {
+      "prompt": "What are the benefits of using transformers for NLP tasks?",
+      "prompt_length": 10,
+      "ttft": 19.363479137420654,
+      "total_time": 19.363497257232666,
+      "throughput": 7064090.947368421,
+      "success": true
+    },
+    {
+      "prompt": "What are the challenges in serving large language models efficiently? Compare with other approaches.",
+      "prompt_length": 14,
+      "ttft": 19.363524675369263,
+      "total_time": 19.36354088783264,
+      "throughput": 7895160.470588235,
+      "success": true
+    },
+    {
+      "prompt": "Summarize the key innovations in the Llama model architecture.",
+      "prompt_length": 9,
+      "ttft": 19.363884449005127,
+      "total_time": 19.363898515701294,
+      "throughput": 9099506.983050847,
+      "success": true
+    },
+    {
+      "prompt": "What are the challenges in serving large language models efficiently? Compare with other approaches.",
+      "prompt_length": 14,
+      "ttft": 19.363917589187622,
+      "total_time": 19.363930463790894,
+      "throughput": 9942053.925925925,
+      "success": true
+    },
+    {
+      "prompt": "What are the main differences between Llama and GPT models?",
+      "prompt_length": 10,
+      "ttft": 19.36383605003357,
+      "total_time": 19.3638596534729,
+      "throughput": 5422938.5050505055,
+      "success": true
+    }
+  ]
+}
