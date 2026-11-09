@@ -11,6 +11,9 @@ import vllm.envs as envs
 from vllm.config import ModelConfig, VllmConfig
 from vllm.config.load import LoadConfig
 from vllm.logger import init_logger
+from vllm.model_executor.model_loader.pinned_weight_staging import (
+    maybe_stage_weight_copies,
+)
 from vllm.model_executor.model_loader.reload import finalize_layerwise_processing
 from vllm.model_executor.model_loader.utils import (
     initialize_model,
@@ -85,7 +88,8 @@ class BaseModelLoader(ABC):
                 )
 
             logger.debug("Loading weights on %s ...", load_device)
-            self.load_weights(model, model_config)
+            with maybe_stage_weight_copies(load_config):
+                self.load_weights(model, model_config)
 
             # Release transient tensors held by PyTorch's caching allocator
             # before weight post-processing and raw CUDA driver allocations.

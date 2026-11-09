@@ -5,11 +5,16 @@
 import copy
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 
 from vllm.utils.torch_utils import is_torch_equal_or_newer
+
+if TYPE_CHECKING:
+    from vllm.model_executor.model_loader.pinned_weight_staging import (
+        PinnedWeightStager,
+    )
 
 _weights_pre_processed: ContextVar[bool] = ContextVar(
     "weights_pre_processed", default=False
@@ -31,6 +36,21 @@ def weights_already_processed():
 
 def is_weights_pre_processed() -> bool:
     return _weights_pre_processed.get()
+
+
+_weight_stager: ContextVar["PinnedWeightStager | None"] = ContextVar(
+    "weight_stager", default=None
+)
+
+
+@contextmanager
+def staging_weight_copies(stager: "PinnedWeightStager"):
+    """Offer each `copy_weight_` call in this context to `stager`."""
+    token = _weight_stager.set(stager)
+    try:
+        yield
+    finally:
+        _weight_stager.reset(token)
 
 
 def set_weight_attrs(
@@ -73,7 +93,13 @@ def copy_weight_(dst: torch.Tensor, src: torch.Tensor) -> torch.Tensor:
 
     Model-specific weight loaders should call this instead of `.copy_()` when
     copying a checkpoint tensor to the device.
+
+    Inside `staging_weight_copies`, the stager makes the copies it accepts (see
+    `PinnedWeightStager`).
     """
+    stager = _weight_stager.get()
+    if stager is not None and stager.copy_(dst, src):
+        return dst
     return dst.copy_(src)
 
 

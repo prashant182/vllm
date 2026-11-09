@@ -115,6 +115,23 @@ class LoadConfig:
     need to be double quoted for json parsing. For more details, see
     the original doc for `map_location` parameter in [`torch.load`][] parameter.
     """
+    pinned_weight_staging: bool = False
+    """
+    Whether to copy checkpoint tensors to the GPU through pinned host memory.
+    Weight loaders copy from memory-mapped checkpoint files, which are pageable
+    memory, and a copy from pageable memory runs well below the bandwidth of a
+    copy from pinned memory. When enabled, each weight copy of at least 1 MiB is
+    gathered on the CPU into one of two 64 MiB pinned buffers and copied to the
+    GPU asynchronously while the next chunk is gathered. The gather needs
+    several CPU threads to outrun the pageable copy; see
+    `pinned_weight_staging_threads`. Applies on CUDA and ROCm. Default is False.
+    """
+    pinned_weight_staging_threads: int = Field(default=8, ge=1)
+    """
+    Minimum number of torch intra-op threads while loading weights with
+    `pinned_weight_staging`. The CPU gather into pinned memory runs on them, and
+    the previous thread count is restored after loading.
+    """
 
     def compute_hash(self) -> str:
         """WARNING: Whenever a new field is added to this config,
