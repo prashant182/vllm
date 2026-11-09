@@ -44,7 +44,8 @@ class PinnedWeightStager:
     gathers a chunk (any strides, converted to `dst.dtype` on the CPU as a
     blocking `copy_` does) into one buffer while the previous chunk is copied
     from the other with `non_blocking=True` on the current stream of `dst`'s
-    device, so later work on that stream is ordered after it. Each buffer's
+    device, so later work on that stream is ordered after it. A non-contiguous
+    `dst` therefore needs a device temporary of at most one chunk. Each buffer's
     event is waited on before the buffer is refilled, and exiting waits for
     both. The gather runs on torch's intra-op threads, and with one thread it is
     about as slow as the pageable copy it replaces, so the stager raises them to
@@ -89,7 +90,7 @@ class PinnedWeightStager:
 
     def copy_(self, dst: torch.Tensor, src: torch.Tensor) -> bool:
         """Stage `dst.copy_(src)` and return True, or return False untouched."""
-        if not self._stages(dst, src):
+        if not self.accepts(dst, src):
             return False
         if not self._buffers:
             self._device = dst.device
@@ -120,7 +121,8 @@ class PinnedWeightStager:
         self.staged_bytes += src.nbytes
         return True
 
-    def _stages(self, dst: torch.Tensor, src: torch.Tensor) -> bool:
+    def accepts(self, dst: torch.Tensor, src: torch.Tensor) -> bool:
+        """Whether `copy_(dst, src)` would stage the copy."""
         return (
             threading.get_ident() == self._owner
             and dst.is_cuda

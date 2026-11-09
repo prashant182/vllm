@@ -53,6 +53,12 @@ def staging_weight_copies(stager: "PinnedWeightStager"):
         _weight_stager.reset(token)
 
 
+def is_weight_copy_staged(dst: torch.Tensor, src: torch.Tensor) -> bool:
+    """Whether `copy_weight_(dst, src)` would go through the active stager."""
+    stager = _weight_stager.get()
+    return stager is not None and stager.accepts(dst, src)
+
+
 def set_weight_attrs(
     weight: torch.Tensor,
     weight_attrs: dict[str, Any] | None,
