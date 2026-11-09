@@ -68,6 +68,15 @@ def set_weight_attrs(
         setattr(weight, key, value)
 
 
+def copy_weight_(dst: torch.Tensor, src: torch.Tensor) -> torch.Tensor:
+    """`dst.copy_(src)` for weight loaders.
+
+    Model-specific weight loaders should call this instead of `.copy_()` when
+    copying a checkpoint tensor to the device.
+    """
+    return dst.copy_(src)
+
+
 def replace_parameter(
     layer: torch.nn.Module,
     param_name: str,
