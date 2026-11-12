@@ -7,12 +7,17 @@ import functools
 import mmap
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, overload
+from typing import TYPE_CHECKING, Any, overload
 
 import torch
 
 from vllm.platforms import current_platform
 from vllm.utils.torch_utils import is_torch_equal_or_newer
+
+if TYPE_CHECKING:
+    from vllm.model_executor.model_loader.pinned_weight_staging import (
+        PinnedWeightStager,
+    )
 
 _weights_pre_processed: ContextVar[bool] = ContextVar(
     "weights_pre_processed", default=False
@@ -34,6 +39,27 @@ def weights_already_processed():
 
 def is_weights_pre_processed() -> bool:
     return _weights_pre_processed.get()
+
+
+_weight_stager: ContextVar["PinnedWeightStager | None"] = ContextVar(
+    "weight_stager", default=None
+)
+
+
+@contextmanager
+def staging_weight_copies(stager: "PinnedWeightStager"):
+    """Offer each `copy_weight_` call in this context to `stager`."""
+    token = _weight_stager.set(stager)
+    try:
+        yield
+    finally:
+        _weight_stager.reset(token)
+
+
+def is_weight_copy_staged(dst: torch.Tensor, src: torch.Tensor) -> bool:
+    """Whether `copy_weight_(dst, src)` would go through the active stager."""
+    stager = _weight_stager.get()
+    return stager is not None and stager.accepts(dst, src)
 
 
 def set_weight_attrs(
@@ -89,7 +115,13 @@ def copy_weight_(dst: torch.Tensor, src: torch.Tensor) -> torch.Tensor:
     PyTorch already stages non-contiguous and dtype-converting copies through
     a CPU temporary. Sources with at most one element are skipped: they count
     as contiguous with any stride, which `view(torch.uint8)` rejects.
+
+    Inside `staging_weight_copies`, the stager makes the copies it accepts (see
+    `PinnedWeightStager`).
     """
+    stager = _weight_stager.get()
+    if stager is not None and stager.copy_(dst, src):
+        return dst
     if (
         src.device.type == "cpu"
         and src.dtype == dst.dtype

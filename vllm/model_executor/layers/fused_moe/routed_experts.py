@@ -30,7 +30,11 @@ from vllm.model_executor.layers.quantization.base_config import (
     QuantizationConfig,
     resolve_quant_method,
 )
-from vllm.model_executor.utils import copy_weight_, kernel_parameters
+from vllm.model_executor.utils import (
+    copy_weight_,
+    is_weight_copy_staged,
+    kernel_parameters,
+)
 from vllm.utils.math_utils import cdiv
 
 if TYPE_CHECKING:
@@ -655,10 +659,12 @@ class RoutedExperts(PluggableLayer):
             and expert_data.device.type == "cuda"
             and not expert_data.is_contiguous()
             and expert_data.ndim == 2
+            and not is_weight_copy_staged(expert_data, loaded_weight)
         ):
             # A strided CPU-to-CUDA copy can allocate a full-shard CUDA
             # temporary. Make the TP slice contiguous on CPU and copy rows
             # in chunks to limit the temporary used for the padded view.
+            # A staged copy is already chunked, so it skips this.
             loaded_weight = loaded_weight.contiguous()
             num_chunks = max(cdiv(loaded_weight.nbytes, 1 << 20), 1)
             for dst, src in zip(
