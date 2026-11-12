@@ -9,6 +9,7 @@ have the original unpadded size. These tests verify that weight loading
 correctly handles this mismatch.
 """
 
+from contextlib import ExitStack
 from types import SimpleNamespace
 
 import pytest
@@ -21,6 +22,11 @@ from vllm.model_executor.layers.fused_moe.routed_experts import RoutedExperts
 from vllm.model_executor.layers.fused_moe.unquantized_fused_moe_method import (
     UnquantizedFusedMoEMethod,
 )
+from vllm.model_executor.model_loader.pinned_weight_staging import (
+    MIN_STAGED_BYTES,
+    PinnedWeightStager,
+)
+from vllm.model_executor.utils import staging_weight_copies
 
 from .utils import make_dummy_moe_config
 
@@ -258,10 +264,11 @@ class TestWeightLoadingWithPaddedHiddenSize:
     """Integration-style tests that simulate padded weight loading."""
 
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
+    @pytest.mark.parametrize("staging", [False, True])
     @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float32])
     @pytest.mark.parametrize("tp_rank", [0, 1])
     def test_load_w2_chunks_noncontiguous_cpu_source_to_padded_cuda(
-        self, dtype, tp_rank
+        self, dtype, tp_rank, staging
     ):
         hidden = 4096
         intermediate = 1024
@@ -287,24 +294,32 @@ class TestWeightLoadingWithPaddedHiddenSize:
         torch.nn.Module.__init__(experts)
         experts.moe_config = make_dummy_moe_config()
         experts.moe_config.moe_parallel_config.tp_size = 2
+        # A 1 MiB buffer splits the staged shard into several chunks.
+        stager = PinnedWeightStager(1, buffer_bytes=MIN_STAGED_BYTES)
 
         torch.accelerator.synchronize()
         allocated_before = torch.accelerator.memory_allocated()
         torch.accelerator.reset_peak_memory_stats()
-        experts._load_w2(
-            expert_data=expert_data_full,
-            shard_dim=1,
-            loaded_weight=loaded_weight,
-            tp_rank=tp_rank,
-        )
+        with ExitStack() as stack:
+            if staging:
+                stack.enter_context(stager)
+                stack.enter_context(staging_weight_copies(stager))
+            experts._load_w2(
+                expert_data=expert_data_full,
+                shard_dim=1,
+                loaded_weight=loaded_weight,
+                tp_rank=tp_rank,
+            )
         torch.accelerator.synchronize()
         peak_extra = torch.accelerator.max_memory_allocated() - allocated_before
 
         # A single copy into the strided CUDA view allocates a full-shard
         # temporary. Correct values alone would not catch that regression.
+        # Staging takes the shard as one copy and bounds it by the buffer.
         assert peak_extra < tp_source.nbytes
+        assert stager.staged_bytes == (tp_source.nbytes if staging else 0)
 
-        torch.testing.assert_close(destination.cpu(), tp_source)
+        assert torch.equal(destination.cpu(), tp_source)
         assert torch.count_nonzero(expert_data_full[hidden:, :]) == 0
         assert torch.count_nonzero(expert_data_full[:hidden, intermediate:]) == 0
 

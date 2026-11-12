@@ -31,6 +31,7 @@ from vllm.model_executor.layers.quantization.base_config import (
     QuantizationConfig,
     resolve_quant_method,
 )
+from vllm.model_executor.utils import copy_weight_, is_weight_copy_staged
 from vllm.utils.math_utils import cdiv
 
 if TYPE_CHECKING:
@@ -360,7 +361,7 @@ class RoutedExperts(PluggableLayer):
         loaded_weight = loaded_weight.narrow(
             shard_dim, shard_size * tp_rank, shard_size
         )
-        param.copy_(loaded_weight)
+        copy_weight_(param, loaded_weight)
 
     def _load_model_weight_or_group_weight_scale(
         self,
@@ -442,7 +443,7 @@ class RoutedExperts(PluggableLayer):
                 hidden_dim=hidden_dim,
                 shard_dim=shard_dim,
             )
-            expert_data.copy_(loaded_weight)
+            copy_weight_(expert_data, loaded_weight)
         elif shard_id in ("w1", "w3"):
             self._load_w13(
                 shard_id=shard_id,
@@ -569,7 +570,7 @@ class RoutedExperts(PluggableLayer):
             hidden_dim=hidden_dim,
             shard_dim=shard_dim,
         )
-        expert_data.copy_(loaded_weight)
+        copy_weight_(expert_data, loaded_weight)
 
     def _load_w2(
         self,
@@ -608,19 +609,21 @@ class RoutedExperts(PluggableLayer):
             and expert_data.device.type == "cuda"
             and not expert_data.is_contiguous()
             and expert_data.ndim == 2
+            and not is_weight_copy_staged(expert_data, loaded_weight)
         ):
             # A strided CPU-to-CUDA copy can allocate a full-shard CUDA
             # temporary. Make the TP slice contiguous on CPU and copy rows
             # in chunks to limit the temporary used for the padded view.
+            # A staged copy is already chunked, so it skips this.
             loaded_weight = loaded_weight.contiguous()
             num_chunks = max(cdiv(loaded_weight.nbytes, 1 << 20), 1)
             for dst, src in zip(
                 expert_data.chunk(num_chunks, dim=0),
                 loaded_weight.chunk(num_chunks, dim=0),
             ):
-                dst.copy_(src)
+                copy_weight_(dst, src)
             return
-        expert_data.copy_(loaded_weight)
+        copy_weight_(expert_data, loaded_weight)
 
     def _load_single_value(
         self, param: torch.nn.Parameter, loaded_weight: torch.Tensor, expert_id: int
@@ -693,11 +696,11 @@ class RoutedExperts(PluggableLayer):
             # (FIXME) for gpt-oss all experts are combined
             if "bias" in weight_name:
                 dim1 = loaded_weight.shape[1]
-                param.data[:, :dim1].copy_(loaded_weight)
+                copy_weight_(param.data[:, :dim1], loaded_weight)
             else:
                 dim1 = loaded_weight.shape[1]
                 dim2 = loaded_weight.shape[2]
-                param.data[:, :dim1, :dim2].copy_(loaded_weight)
+                copy_weight_(param.data[:, :dim1, :dim2], loaded_weight)
             return True if return_success else None
 
         quant_method_name = self.quant_method.__class__.__name__
@@ -789,7 +792,7 @@ class RoutedExperts(PluggableLayer):
                     loaded_weight,
                     hidden_dim=0,
                 )
-                expert_data.copy_(loaded_weight)
+                copy_weight_(expert_data, loaded_weight)
             else:
                 self._load_w13(
                     shard_id=shard_id,
